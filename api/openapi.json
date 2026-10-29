@@ -1,0 +1,2580 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Seven-Air-Link M3",
+    "version": "0.1.0-rc.1",
+    "description": "Implemented M1/M2 networking plus M3 Human/Bot collaboration. Browser, CLI and Bot use this same API. No Agent runtime, model execution or A2A. TLS is mandatory; Cookie mutations require same-origin and X-SLB-CSRF. Principal credentials never inherit bound Device permissions. JSON schema-3 storage, not SQLite. Independent HTTP Gateway origin and data-WS protocol remain documented in docs/PROTOCOL-M2.md. Detailed collaboration semantics: docs/CLI-M3.md."
+  },
+  "servers": [
+    {
+      "url": "https://localhost:7777"
+    }
+  ],
+  "security": [
+    {
+      "Bearer": []
+    },
+    {
+      "BrowserSession": []
+    }
+  ],
+  "paths": {
+    "/healthz": {
+      "get": {
+        "summary": "Process liveness",
+        "description": "Process liveness",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Structured error; non-2xx never means success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/readyz": {
+      "get": {
+        "summary": "Metadata directory readiness (not disk-write/volume health guarantee)",
+        "description": "Metadata directory readiness (not disk-write/volume health guarantee)",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Structured error; non-2xx never means success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/v1/info": {
+      "get": {
+        "summary": "Public version, protocol and fingerprint",
+        "description": "Public version, protocol and fingerprint",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Structured error; non-2xx never means success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/v1/me": {
+      "get": {
+        "summary": "Authenticated subject and browser CSRF token",
+        "description": "Authenticated subject (Owner/Device/Member), optional Principal description and browser CSRF token. Does not return long-lived credentials. A Device is not a messenger.",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Structured error; non-2xx never means success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/status": {
+      "get": {
+        "summary": "Visible device snapshot and heartbeat configuration",
+        "description": "Visible device snapshot and heartbeat configuration",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Structured error; non-2xx never means success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/pairings": {
+      "post": {
+        "summary": "Owner creates single-use invitation",
+        "description": "Owner creates single-use invitation",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PairingResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Structured error; non-2xx never means success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PairingRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/join": {
+      "post": {
+        "summary": "Consume invitation and issue independent Device credential",
+        "description": "Consume invitation and issue independent Device credential",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JoinResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Structured error; non-2xx never means success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JoinRequest"
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/v1/devices": {
+      "get": {
+        "summary": "Owner sees all devices; a Device sees only itself",
+        "description": "Owner sees all devices; a Device sees only itself",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Devices"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Structured error; non-2xx never means success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/devices/{id}": {
+      "delete": {
+        "summary": "Owner permanently revokes Device and closes active connection",
+        "description": "Owner permanently revokes Device and closes active connection",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Structured error; non-2xx never means success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "patch": {
+        "summary": "Owner renames a Device",
+        "description": "Owner renames a Device",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Structured error; non-2xx never means success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Rename"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/browser-tickets": {
+      "post": {
+        "summary": "Principal creates a 120-second one-use browser login ticket for itself",
+        "description": "Owner and Member allowed. Ticket is bound to the actual Principal and credential generation; no Owner escalation. Device credentials cannot create collaboration sessions. Reenrollment/revocation invalidates outstanding tickets.",
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Structured error; non-2xx never means success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sessions": {
+      "post": {
+        "summary": "Consume browser ticket, issue Secure HttpOnly SameSite=Strict cookie",
+        "description": "Consume browser ticket, issue Secure HttpOnly SameSite=Strict cookie",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Structured error; non-2xx never means success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Login"
+              }
+            }
+          }
+        },
+        "security": []
+      },
+      "delete": {
+        "summary": "Logout current browser session; X-SLB-CSRF is required for Cookie auth",
+        "description": "Logout current browser session; X-SLB-CSRF is required for Cookie auth",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Structured error; non-2xx never means success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/activity": {
+      "get": {
+        "summary": "Principal-scoped audit metadata history",
+        "description": "Owner sees all operation metadata; Member only its own actor ID. Optional actor/correlation filters cannot widen scope. Never includes private message text, file bytes, credential secrets or tunneled business data. Only Bridge-mediated actions are observed; external host commands are not automatically audited.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Activity"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Structured error; non-2xx never means success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "after",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500
+            }
+          },
+          {
+            "name": "actor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Restrict to actor ID, within role scope."
+          },
+          {
+            "name": "correlation",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Exact correlation ID filter."
+          }
+        ]
+      }
+    },
+    "/api/v1/events": {
+      "get": {
+        "summary": "Principal-scoped audit metadata SSE",
+        "description": "Owner sees all operation metadata; Member only its own actor ID. Optional actor/correlation filters cannot widen scope. Never includes private message text, file bytes, credential secrets or tunneled business data. Only Bridge-mediated actions are observed; external host commands are not automatically audited.",
+        "responses": {
+          "200": {
+            "description": "SSE stream",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Structured error; non-2xx never means success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "Last-Event-ID",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "actor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Restrict to actor ID, within role scope."
+          },
+          {
+            "name": "correlation",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Exact correlation ID filter."
+          }
+        ]
+      }
+    },
+    "/api/v1/node/control": {
+      "get": {
+        "summary": "Device-only RFC6455 upgrade, subprotocol slb.control.v1",
+        "description": "Device Bearer only; no Browser Cookie/Origin. slb.control.v1 and X-Bridge-Protocol:1. welcome.networkProtocol=1 enables services.ready, tunnel.open, tunnel.failed. Heartbeat semantics inherited; 16KiB text messages; no business byte payload here.",
+        "responses": {
+          "101": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Structured error; non-2xx never means success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-Bridge-Protocol",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "const": "1"
+            }
+          }
+        ],
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/services": {
+      "get": {
+        "summary": "List managed or explicitly authorized services",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "services": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Service"
+                      }
+                    },
+                    "proxyPort": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Structured failure, never a successful placeholder",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Device registers a locally approved service; persistence alone does not indicate readiness",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Service"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Structured failure, never a successful placeholder",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServiceCreate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/services/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "get": {
+        "summary": "Get a visible service by ID or active name",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Service"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Structured failure, never a successful placeholder",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Owner/serving Device replaces ACL; closes all old streams and invalidates browser grants",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Structured failure, never a successful placeholder",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Grants"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Stop service permanently until explicit new local share; tombstone retained",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Structured failure, never a successful placeholder",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/services/{id}/browser-ticket": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "post": {
+        "summary": "Create one-use 2-minute service-scoped Gateway login ticket; explicit service use grant required",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProxyTicket"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Structured failure, never a successful placeholder",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/forwards": {
+      "get": {
+        "summary": "Visible foreground forwarding leases",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "forwards": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Forward"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Structured failure, never a successful placeholder",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create 15-second foreground listener lease; CLI binds local socket separately",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Forward"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Structured failure, never a successful placeholder",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForwardCreate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/forwards/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "patch": {
+        "summary": "Actor renews lease; expired lease is not resurrected",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "forward": {
+                      "$ref": "#/components/schemas/Forward"
+                    },
+                    "serviceStatus": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Structured failure, never a successful placeholder",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Actor or Owner closes all lease streams; CLI exits on next renewal",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Structured failure, never a successful placeholder",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tunnels": {
+      "post": {
+        "summary": "Allocate one TCP stream using a valid own forward lease; one-use source ticket",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TunnelTicket"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Structured failure, never a successful placeholder",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TunnelRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tunnel/data": {
+      "get": {
+        "summary": "WSS binary stream attach: slb.data.v1, explicit Bearer and one-use identity/side ticket",
+        "responses": {
+          "101": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Structured failure, never a successful placeholder",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-SLB-Tunnel-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-SLB-Tunnel-Ticket",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "No browser Origin or Cookie authentication. Binary messages <=16KiB: READY=0, DATA=1, FIN=2, RESET=3. ACL/session/revision rechecked on attach. See PROTOCOL-M2.md."
+      }
+    },
+    "/api/v1/peers": {
+      "get": {
+        "summary": "Discover ordinary Human/Bot participants",
+        "description": "Owner/Member only; devices are not chat participants. Members see active identities plus themselves; Owner additionally sees pending/revoked states. listening reports subscriptions, not model activity.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "peers": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Principal"
+                      }
+                    },
+                    "workspace": {
+                      "const": "shared"
+                    },
+                    "note": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "peers",
+                    "workspace",
+                    "note"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Structured error; no success is implied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/principals": {
+      "post": {
+        "summary": "Owner creates a pending Human or Bot identity",
+        "description": "Owner authorization is the human approval. Issues a 5-minute one-use invitation; no model is started. At most 256 stored member identities, including revoked records.",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Enrollment"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Structured error; no success is implied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PrincipalCreate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/identity/claim": {
+      "post": {
+        "summary": "Claim a one-use binding invitation",
+        "description": "Requires pinned TLS and a valid unconsumed code, not an existing login. IP-rate-limited. Successful claim returns an independent member credential. Concurrent replay cannot produce a second success.",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Claim"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Structured error; no success is implied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "code"
+                ]
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/v1/principals/{id}": {
+      "delete": {
+        "summary": "Owner permanently revokes one member identity",
+        "description": "Persists revocation and invalidates running sessions, tickets, subscriptions, leases and TCP flows. Revoked identities cannot be restored by reenrollment. Does not revoke unrelated devices.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "revoked": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "revoked"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Structured error; no success is implied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ]
+      }
+    },
+    "/api/v1/principals/{id}/rotate": {
+      "post": {
+        "summary": "Owner invalidates old credentials and issues a new binding invitation",
+        "description": "Immediately removes the old credential generation, including active capabilities. Same Principal ID and history remain. New credential lifetime is 30 days; invitation expires in 5 minutes. No silent reuse of an old browser ticket or forwarding lease.",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Enrollment"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Structured error; no success is implied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ]
+      }
+    },
+    "/api/v1/messages": {
+      "get": {
+        "summary": "List authorized messages with durable cursors",
+        "description": "Owner/Member. Default newest-first history; after requests ascending replay. Only direct sender/recipient or shared members see text. Owner management privileges cannot read a third-party DM through this API. Cursors can advance over invisible messages.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessagePage"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Structured error; no success is implied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "with",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "shared or peer Principal ID; omitted includes all conversations visible to this identity."
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "description": "Ascending incremental read after sequence."
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "Older history, mutually exclusive with after."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          }
+        ]
+      },
+      "post": {
+        "summary": "Durably accept one text/attachment message",
+        "description": "Owner/Member only. Atomic snapshot of message and metadata audit. Sender is the authenticated subject, never caller-supplied. Exact idempotent retry is 200; same key changed payload is 409. Quota rejects rather than evicting existing history. Attachment ACL may not be widened.",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "$ref": "#/components/schemas/Message"
+                    },
+                    "duplicate": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "duplicate"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Structured error; no success is implied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Exact idempotent repeat; no new message persisted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "$ref": "#/components/schemas/Message"
+                    },
+                    "duplicate": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "duplicate"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MessageSend"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/messages/{id}": {
+      "get": {
+        "summary": "Read one authorized message",
+        "description": "Invisible and nonexistent message IDs both return 404. Device credentials are not permitted.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Structured error; no success is implied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ]
+      }
+    },
+    "/api/v1/messages/stream": {
+      "get": {
+        "summary": "Subscribe to authorized inbox messages",
+        "description": "SSE event types ready, message.created, checkpoint, session.expired and resync. Message payload uses Message schema; checkpoint carries {} and advances the message cursor even across invisible records. At-least-once on reconnect; consumer must deduplicate. Revocation/rotation terminates the stream. Cursor beyond current durable sequence requires explicit resync. Up to four inbox streams per identity, 64 inbox+activity streams globally. --incoming-only is a CLI-side filter, not an API authorization option.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Structured error; no success is implied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          },
+          {
+            "name": "Last-Event-ID",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Overrides cursor query when present."
+          },
+          {
+            "name": "with",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "shared or peer Principal ID."
+          }
+        ]
+      }
+    },
+    "/api/v1/files": {
+      "post": {
+        "summary": "Upload raw bytes into a Principal-scoped attachment",
+        "description": "Owner/Member. Raw body, NOT multipart. Max 200 MiB/file, four concurrent uploads, 1 GiB aggregate logical active bytes and 4096 metadata records. Stream to temporary storage, compute SHA-256, then commit metadata; no automatic retry. Upload immediately grants recipient/shared access; sending a chat message is a separate operation. Crash-orphan cleanup is not implemented.",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/File"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Structured error; no success is implied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "name",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Original filename only, no path or control characters.",
+            "required": true
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "shared by default or active Principal ID."
+          },
+          {
+            "name": "Content-Length",
+            "in": "header",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 209715200
+            },
+            "description": "Required exact byte count.",
+            "required": true
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "List attachment metadata visible to the caller",
+        "description": "Returns non-deleted attachments owned by or addressed to caller, or shared workspace. Device credentials cannot list attachments.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "files": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/File"
+                      }
+                    }
+                  },
+                  "required": [
+                    "files"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Structured error; no success is implied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/files/{id}": {
+      "get": {
+        "summary": "Download an ACL-authorized attachment",
+        "description": "GET/HEAD checks the same Principal ACL as metadata. application/octet-stream and attachment disposition prevent active rendering on the management origin. Authentication rechecked during body reads; already-buffered bytes cannot be retracted.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            },
+            "headers": {
+              "X-Content-SHA256": {
+                "description": "SHA-256 of full file",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Content-Disposition": {
+                "description": "attachment; safe filename",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "description": "Quoted SHA-256",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Structured error; no success is implied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "206": {
+            "description": "Authorized partial content (Range request)",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "name": "Range",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Standard single/multiple byte range processed by ServeContent."
+          }
+        ]
+      },
+      "head": {
+        "summary": "Read authorized attachment headers without bytes",
+        "description": "Read authorized attachment headers without bytes",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Structured error; no success is implied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ]
+      },
+      "delete": {
+        "summary": "Uploader deletes its own attachment",
+        "description": "Only uploader. Commit tombstone before physical deletion; never use a user filename as storage path. cleanupPending signals physical deletion failure, not automatic durable garbage collection.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "deleted": {
+                      "type": "boolean"
+                    },
+                    "cleanupPending": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "deleted",
+                    "cleanupPending"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Structured error; no success is implied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ]
+      }
+    },
+    "/api/v1/files/{id}/meta": {
+      "get": {
+        "summary": "Read ACL-authorized attachment metadata",
+        "description": "Read ACL-authorized attachment metadata",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/File"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Structured error; no success is implied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ]
+      }
+    },
+    "/api/v1/storage": {
+      "get": {
+        "summary": "Owner-only SQLite readiness and storage accounting (no secrets or content)",
+        "responses": {
+          "200": {
+            "description": "SQLite stats; full integrity/hashes via offline storage check"
+          },
+          "403": {
+            "description": "Owner required"
+          },
+          "503": {
+            "description": "Storage unavailable"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "Bearer": {
+        "type": "http",
+        "scheme": "bearer"
+      },
+      "BrowserSession": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "slb_session"
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "requestId": {
+                "type": "string"
+              },
+              "retryable": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "code",
+              "message",
+              "retryable"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "additionalProperties": false
+      },
+      "PairingRequest": {
+        "type": "object",
+        "properties": {
+          "ttlSeconds": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 900
+          }
+        },
+        "required": [
+          "ttlSeconds"
+        ],
+        "additionalProperties": false
+      },
+      "PairingResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Single-use secret, never put in URL"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "code",
+          "expiresAt"
+        ],
+        "additionalProperties": false
+      },
+      "JoinRequest": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "os": {
+            "type": "string",
+            "maxLength": 32
+          },
+          "arch": {
+            "type": "string",
+            "maxLength": 32
+          },
+          "nodeVersion": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "protocol": {
+            "type": "integer",
+            "const": 1
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "protocol"
+        ],
+        "additionalProperties": false
+      },
+      "JoinResponse": {
+        "type": "object",
+        "properties": {
+          "deviceId": {
+            "type": "string"
+          },
+          "token": {
+            "type": "string",
+            "description": "Device-scoped credential; save in protected profile"
+          },
+          "protocol": {
+            "type": "integer",
+            "const": 1
+          }
+        },
+        "required": [
+          "deviceId",
+          "token",
+          "protocol"
+        ],
+        "additionalProperties": false
+      },
+      "Device": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "os": {
+            "type": "string"
+          },
+          "arch": {
+            "type": "string"
+          },
+          "nodeVersion": {
+            "type": "string"
+          },
+          "ownerId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "online",
+              "offline",
+              "revoked"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "revokedAt": {
+            "type": "string"
+          },
+          "lastSeen": {
+            "type": "string"
+          },
+          "ip": {
+            "type": "string",
+            "description": "Server-observed peer IP; no trust in X-Forwarded-For"
+          },
+          "sessionId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "ownerId",
+          "status",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      },
+      "Devices": {
+        "type": "object",
+        "properties": {
+          "devices": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Device"
+            }
+          }
+        },
+        "required": [
+          "devices"
+        ],
+        "additionalProperties": false
+      },
+      "Event": {
+        "type": "object",
+        "properties": {
+          "seq": {
+            "type": "integer"
+          },
+          "time": {
+            "type": "string"
+          },
+          "actorId": {
+            "type": "string"
+          },
+          "deviceId": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string"
+          },
+          "resourceId": {
+            "type": "string"
+          },
+          "result": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "correlationId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "seq",
+          "time",
+          "actorId",
+          "action",
+          "result"
+        ],
+        "additionalProperties": false
+      },
+      "Activity": {
+        "type": "object",
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Event"
+            }
+          },
+          "nextCursor": {
+            "type": "integer"
+          },
+          "snapshotSeq": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "events",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      },
+      "Rename": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "Login": {
+        "type": "object",
+        "properties": {
+          "ticket": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticket"
+        ],
+        "additionalProperties": false
+      },
+      "ServiceCreate": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^svc_[A-Za-z0-9_-]{8,64}$"
+          },
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,47}$"
+          },
+          "protocol": {
+            "type": "string",
+            "enum": [
+              "http",
+              "tcp"
+            ]
+          },
+          "target": {
+            "type": "string",
+            "description": "Numeric loopback IP:port only"
+          },
+          "allowDevices": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "allowPrincipals": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Explicit Principal IDs (including ordinary Human/Bot members). A bound Device grant does not apply to member credentials."
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "protocol",
+          "target"
+        ]
+      },
+      "Service": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^svc_[A-Za-z0-9_-]{8,64}$"
+          },
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,47}$"
+          },
+          "protocol": {
+            "type": "string",
+            "enum": [
+              "http",
+              "tcp"
+            ]
+          },
+          "target": {
+            "type": "string",
+            "description": "Numeric loopback IP:port only"
+          },
+          "allowDevices": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "allowPrincipals": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Explicit Principal IDs (including ordinary Human/Bot members). A bound Device grant does not apply to member credentials."
+          },
+          "ownerDeviceId": {
+            "type": "string"
+          },
+          "ownerPrincipalId": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "disabled": {
+            "type": "boolean"
+          },
+          "revision": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "online",
+              "offline",
+              "unapproved",
+              "stopped",
+              "revoked"
+            ]
+          },
+          "activeConnections": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "protocol",
+          "target",
+          "ownerDeviceId",
+          "ownerPrincipalId",
+          "revision",
+          "disabled"
+        ]
+      },
+      "Grants": {
+        "type": "object",
+        "properties": {
+          "allowDevices": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "allowPrincipals": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Explicit Principal IDs (including ordinary Human/Bot members). A bound Device grant does not apply to member credentials."
+          }
+        }
+      },
+      "Forward": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "serviceId": {
+            "type": "string"
+          },
+          "actorId": {
+            "type": "string"
+          },
+          "actorRole": {
+            "type": "string",
+            "enum": [
+              "owner",
+              "device"
+            ]
+          },
+          "listen": {
+            "type": "string"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "serviceId",
+          "actorId",
+          "listen",
+          "expiresAt"
+        ]
+      },
+      "ForwardCreate": {
+        "type": "object",
+        "properties": {
+          "serviceId": {
+            "type": "string",
+            "description": "Service ID or unique active name"
+          },
+          "listen": {
+            "type": "string",
+            "description": "Resolved numeric loopback IP and nonzero actual bound port"
+          }
+        },
+        "required": [
+          "serviceId",
+          "listen"
+        ]
+      },
+      "TunnelRequest": {
+        "type": "object",
+        "properties": {
+          "forwardId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "forwardId"
+        ]
+      },
+      "TunnelTicket": {
+        "type": "object",
+        "properties": {
+          "tunnelId": {
+            "type": "string"
+          },
+          "ticket": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "tunnelId",
+          "ticket",
+          "expiresAt"
+        ]
+      },
+      "ProxyTicket": {
+        "type": "object",
+        "properties": {
+          "ticket": {
+            "type": "string"
+          },
+          "serviceId": {
+            "type": "string"
+          },
+          "loginURL": {
+            "type": "string",
+            "format": "uri"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticket",
+          "serviceId",
+          "loginURL",
+          "expiresAt"
+        ]
+      },
+      "Principal": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "human",
+              "bot"
+            ]
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "owner",
+              "member"
+            ]
+          },
+          "ownerId": {
+            "type": "string"
+          },
+          "deviceId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "pending",
+              "expired",
+              "revoked",
+              "device_revoked"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "revokedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "listening": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Current inbox subscription count; NOT evidence that an AI model is running or executing a request."
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "type",
+          "role",
+          "ownerId",
+          "status",
+          "createdAt",
+          "listening"
+        ]
+      },
+      "PrincipalCreate": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "human",
+              "bot"
+            ]
+          },
+          "deviceId": {
+            "type": "string",
+            "description": "Optional lifecycle association, not a source of inherited permissions."
+          },
+          "ttlSeconds": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 31536000,
+            "default": 2592000,
+            "description": "0 or omitted selects 30 days. A nonzero value must be at least 60 seconds; maximum 365 days."
+          }
+        },
+        "required": [
+          "name",
+          "type"
+        ],
+        "additionalProperties": false
+      },
+      "Enrollment": {
+        "type": "object",
+        "properties": {
+          "principal": {
+            "$ref": "#/components/schemas/Principal"
+          },
+          "code": {
+            "type": "string",
+            "description": "Secret, single-use 5-minute binding code. Never place in URL, audit or durable server plaintext."
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "principal",
+          "code",
+          "expiresAt"
+        ]
+      },
+      "Claim": {
+        "type": "object",
+        "properties": {
+          "principal": {
+            "$ref": "#/components/schemas/Principal"
+          },
+          "token": {
+            "type": "string",
+            "description": "Long-lived Principal credential returned once; store in a protected local profile."
+          }
+        },
+        "required": [
+          "principal",
+          "token"
+        ]
+      },
+      "MessageSend": {
+        "type": "object",
+        "properties": {
+          "clientMessageId": {
+            "type": "string",
+            "description": "Caller-selected idempotency key. Deduplicated with sender ID; changed payload under same key returns 409."
+          },
+          "to": {
+            "type": "string",
+            "description": "Active Principal ID or literal shared."
+          },
+          "text": {
+            "type": "string",
+            "description": "At most 32768 UTF-8 bytes (not characters). Entire request JSON at most 256 KiB. Text may be empty only with an attachment."
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 8
+          },
+          "replyTo": {
+            "type": "string",
+            "description": "Visible message in this same conversation only."
+          },
+          "correlationId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "clientMessageId",
+          "to"
+        ],
+        "additionalProperties": false
+      },
+      "Message": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "seq": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Durable message sequence; distinct from activity cursor."
+          },
+          "clientMessageId": {
+            "type": "string"
+          },
+          "senderId": {
+            "type": "string"
+          },
+          "recipientId": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "text"
+            ]
+          },
+          "text": {
+            "type": "string"
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "replyTo": {
+            "type": "string"
+          },
+          "correlationId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "accepted"
+            ],
+            "description": "Server durable acceptance only: does not mean online, read or executed."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "seq",
+          "clientMessageId",
+          "senderId",
+          "recipientId",
+          "kind",
+          "text",
+          "attachments",
+          "status",
+          "createdAt"
+        ]
+      },
+      "MessagePage": {
+        "type": "object",
+        "properties": {
+          "messages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Message"
+            }
+          },
+          "nextCursor": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "snapshotSeq": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "messages",
+          "nextCursor",
+          "snapshotSeq",
+          "hasMore"
+        ]
+      },
+      "File": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 209715200
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "ownerId": {
+            "type": "string"
+          },
+          "recipientId": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "deletedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "size",
+          "sha256",
+          "ownerId",
+          "recipientId",
+          "createdAt"
+        ]
+      }
+    }
+  },
+  "x-http-gateway": {
+    "separateListener": "--proxy-listen HOST:PORT; disabled by default",
+    "login": "POST /_bridge/login; application/x-www-form-urlencoded body fields serviceId,ticket; no URL credentials",
+    "proxy": "/proxy/{serviceId}/{path}; HTTP services only; no management API",
+    "credentials": "30-minute service-specific HttpOnly/Secure/SameSite Cookie, or explicitly granted Bearer. Authorization/Cookie/X-SLB-* removed upstream; Set-Cookie removed downstream. Trusted applications only; distinct paths are not browser origins."
+  },
+  "x-release-boundaries": [
+    "JSON schema 3; SQLite and legacy Python import remain deferred.",
+    "No AI task execution, delivery/read receipts, model wakeup or Agent protocol.",
+    "M2 local Node approval and explicit service ACL are unchanged.",
+    "Linux local test evidence is not macOS/Windows native acceptance or production security audit."
+  ]
+}

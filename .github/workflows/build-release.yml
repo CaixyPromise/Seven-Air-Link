@@ -1,0 +1,154 @@
+name: Seven-Air-Link · Native multi-platform builds
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    tags:
+      - '[0-9]*.[0-9]*.[0-9]*-rc.*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: seven-air-link-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: ${{ matrix.platform }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { platform: darwin-arm64, runner: macos-15 }
+          - { platform: darwin-amd64, runner: macos-15-intel }
+          - { platform: windows-amd64, runner: windows-2025 }
+          - { platform: linux-amd64, runner: ubuntu-24.04 }
+          - { platform: linux-arm64, runner: ubuntu-24.04-arm }
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Install supported Go toolchain
+        uses: actions/setup-go@v6
+        with:
+          go-version: stable
+          cache: false
+      - name: Install Python for checksums and archives
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install Linux SQLite build dependencies
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libsqlite3-dev pkg-config
+      - name: Install MSYS2 UCRT64 toolchain and SQLite
+        if: runner.os == 'Windows'
+        id: msys2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-sqlite3
+      - name: Test and build Linux
+        if: runner.os == 'Linux'
+        shell: bash
+        env:
+          CGO_ENABLED: '1'
+        run: |
+          set -euo pipefail
+          go test ./...
+          go vet ./...
+          mkdir -p dist
+          go build -buildvcs=false -trimpath -ldflags='-s -w' \
+            -o 'dist/seven-air-link-${{ matrix.platform }}' ./cmd/seven-air-link
+          './dist/seven-air-link-${{ matrix.platform }}' version
+          file 'dist/seven-air-link-${{ matrix.platform }}'
+      - name: Test and build macOS against Apple SDK SQLite
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          CGO_ENABLED: '1'
+        run: |
+          set -euo pipefail
+          export SDKROOT="$(xcrun --sdk macosx --show-sdk-path)"
+          export CC="$(xcrun --find clang)"
+          test -f "$SDKROOT/usr/include/sqlite3.h"
+          export CGO_CFLAGS="-I$SDKROOT/usr/include"
+          export CGO_LDFLAGS="-L$SDKROOT/usr/lib"
+          go test ./...
+          go vet ./...
+          mkdir -p dist
+          go build -buildvcs=false -trimpath -ldflags='-s -w' \
+            -o 'dist/seven-air-link-${{ matrix.platform }}' ./cmd/seven-air-link
+          './dist/seven-air-link-${{ matrix.platform }}' version
+          otool -L 'dist/seven-air-link-${{ matrix.platform }}' | tee sqlite-linkage.txt
+          ! grep -E '/opt/homebrew/|/usr/local/opt/' sqlite-linkage.txt
+      - name: Test and build Windows UCRT64
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          SAL_UCRT64: ${{ steps.msys2.outputs.msys2-location }}\ucrt64
+        run: |
+          ./build-windows.ps1
+          if ($LASTEXITCODE -ne 0) { throw "Windows native build failed" }
+          if (-not (Test-Path ./dist/seven-air-link-windows-amd64.exe)) { throw 'Missing Windows executable' }
+          if (-not (Test-Path ./dist/libsqlite3-0.dll)) { throw 'Missing SQLite DLL' }
+      - name: Package release archive (verified OS/arch/version)
+        shell: bash
+        env:
+          RELEASE_REF: ${{ github.ref_name }}
+          RELEASE_IS_TAG: ${{ github.ref_type == 'tag' }}
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          python scripts/ci_package.py --platform "$PLATFORM" \
+            --ref "$RELEASE_REF" --is-tag "$RELEASE_IS_TAG"
+      - name: Upload platform artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: seven-air-link-${{ matrix.platform }}
+          path: release/*
+          if-no-files-found: error
+          retention-days: 30
+
+  prerelease:
+    name: Publish RC prerelease (all five builds must succeed)
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Download platform archives
+        uses: actions/download-artifact@v4
+        with:
+          pattern: seven-air-link-*
+          path: release
+          merge-multiple: true
+      - name: Verify all five ZIP archives
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd release
+          sha256sum -c ./*.zip.sha256
+          test "$(find . -name '*.zip' | wc -l)" -eq 5
+      - name: Create GitHub Release marked prerelease
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          gh release create "$GITHUB_REF_NAME" \
+            release/*.zip release/*.zip.sha256 \
+            --verify-tag --generate-notes --prerelease --latest=false \
+            --title "Seven-Air-Link $GITHUB_REF_NAME"

@@ -1,0 +1,48 @@
+/bin/
+/dist/
+/.slb*/
+*.test
+coverage.out
+node-*.json
+*.lock
+.DS_Store
+
+/seven-air-link
+/seven-air-link.exe
+
+__pycache__/
+*.pyc
+*.node.json
+*.services.json
+
+# M4 sensitive runtime state (fixtures are created outside the source checkout)
+bridge.db*
+metadata.json*
+server.key
+admin.json
+manifest.json
+*.cursor
+/uploads/
+
+/server-data/
+/seven-air-link-data/
+*.node.json
+*.services.json
+*.cursor
+
+# Generated test / local build reports
+/reports/
+# Local state at any nesting (never commit credentials, SQLite DB or private uploads)
+**/admin.json
+**/server.key
+**/bridge.db*
+**/metadata.json*
+**/uploads/
+**/windows-node.json
+**/mac-node.json
+**/*-bot.json
+**/*.cursor
+/.seven-air-link/
+
+# Release binaries are published as workflow artifacts, never committed
+/release/

@@ -1,0 +1,31 @@
+name: Bug report
+description: Report reproducible behavior with environment details
+title: "bug: "
+labels: [bug]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Include expected behavior and concise actual behavior.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      placeholder: 0.1.0-rc.1
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Platform
+      options: [macOS arm64, macOS amd64, Windows amd64, Linux amd64, Linux arm64, Other]
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction and logs
+      description: Redact credentials, tokens, and private file contents.
+    validations:
+      required: true

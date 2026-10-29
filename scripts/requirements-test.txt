@@ -1,0 +1,3 @@
+# Only the independent WebSocket compatibility fixtures need this.
+websockets==16.0
+# Optional UI: playwright and Chromium. Optional resource snapshots: psutil.
