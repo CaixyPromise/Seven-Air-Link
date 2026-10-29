@@ -398,6 +398,14 @@ func Backup(data, dest string) (BackupReport, error) {
 		snap = st.s
 		manifest.Schema = 4
 		target := filepath.Join(stage, "bridge.db")
+		// SQLite NOFOLLOW also checks VACUUM INTO output path components.
+		// Canonicalize the private stage: macOS /var links to /private/var.
+		resolvedStage, resolveErr := filepath.EvalSymlinks(stage)
+		if resolveErr != nil {
+			st.Close()
+			return r, resolveErr
+		}
+		target = filepath.Join(resolvedStage, "bridge.db")
 		// VACUUM INTO creates its own file. Apple SQLite refuses an existing
 		// destination, so never pre-create the file.
 		if _, e = os.Lstat(target); !os.IsNotExist(e) {
