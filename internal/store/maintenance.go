@@ -398,15 +398,18 @@ func Backup(data, dest string) (BackupReport, error) {
 		snap = st.s
 		manifest.Schema = 4
 		target := filepath.Join(stage, "bridge.db")
-		f, e := os.OpenFile(target, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
-		if e != nil {
+		// VACUUM INTO creates its own file. Apple SQLite refuses an existing
+		// destination, so never pre-create the file.
+		if _, e = os.Lstat(target); !os.IsNotExist(e) {
 			st.Close()
-			return r, e
+			return r, errors.New("backup target already exists or cannot be inspected")
 		}
-		f.Close()
 		_, e = st.db.Exec("VACUUM INTO ?", target)
 		st.Close()
 		if e != nil {
+			return r, e
+		}
+		if e = os.Chmod(target, 0600); e != nil {
 			return r, e
 		}
 		// A backup is a standalone database, not a DB file depending on a separate WAL.
@@ -419,7 +422,7 @@ func Backup(data, dest string) (BackupReport, error) {
 		if e != nil {
 			return r, e
 		}
-		f, e = os.OpenFile(target, os.O_RDWR, 0600)
+		f, e := os.OpenFile(target, os.O_RDWR, 0600)
 		if e != nil {
 			return r, e
 		}

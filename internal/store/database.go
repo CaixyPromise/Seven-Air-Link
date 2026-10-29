@@ -53,7 +53,7 @@ func createDB(path string, s snapshot) (*Store, error) {
 	if e = configureDB(db); e != nil {
 		return fail(e)
 	}
-	st := &Store{path: path, db: db, s: s}
+	st := &Store{path: db.Path(), db: db, s: s}
 	st.s.Version = 4
 	e = db.Transaction(func(tx *sqlite.Tx) error {
 		for _, q := range schema {
@@ -95,7 +95,7 @@ func openDB(path string) (*Store, error) {
 	if e = checkCounts(db, s); e != nil {
 		return fail(e)
 	}
-	return &Store{path: path, db: db, s: s}, nil
+	return &Store{path: db.Path(), db: db, s: s}, nil
 }
 func checkSchema(db *sqlite.DB) error {
 	rows, e := db.Query("PRAGMA quick_check")
