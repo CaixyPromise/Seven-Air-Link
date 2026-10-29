@@ -31,6 +31,7 @@ func TestServiceAuthorityAndIdempotentRecovery(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
+	t.Cleanup(func() { _ = st.Close() })
 	join := func(name string) model.JoinResponse {
 		p, _ := st.Pair(time.Minute, "")
 		j, e := st.Join(model.JoinRequest{Code: p.Code, Name: name, Protocol: 1}, 16, "")
@@ -83,6 +84,7 @@ func TestServiceAuthorityAndIdempotentRecovery(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
+	t.Cleanup(func() { _ = reopened.Close() })
 	if _, e = reopened.CreateService(sub, req, ""); !errors.Is(e, ErrServiceStopped) {
 		t.Fatal("restart resurrected service")
 	}

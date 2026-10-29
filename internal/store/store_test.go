@@ -42,6 +42,7 @@ func TestPairPersistRevoke(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
+	t.Cleanup(func() { _ = reopened.Close() })
 	if sub, e := reopened.Auth(owner); e != nil || sub.Role != "owner" {
 		t.Fatal(sub, e)
 	}

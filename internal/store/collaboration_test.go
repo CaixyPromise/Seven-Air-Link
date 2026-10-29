@@ -114,6 +114,7 @@ func TestPrincipalEnrollmentConcurrentRotationAndPersistence(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
+	t.Cleanup(func() { _ = reopened.Close() })
 	if _, e = reopened.Auth(newer.Token); e != nil {
 		t.Fatal(e)
 	}
@@ -301,6 +302,7 @@ func TestMessagePagingRepliesAndResume(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
+	t.Cleanup(func() { _ = reopened.Close() })
 	page, e := reopened.Messages(b, "", 8, 0, 100)
 	if e != nil || len(page.Messages) != 1 || page.Messages[0].ReplyTo != direct.ID {
 		t.Fatal(page, e)

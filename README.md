@@ -1,6 +1,6 @@
 # Seven-Air-Link
 
-**Version: `0.1.0-rc.1` · lightweight cross-device development and AI collaboration bridge**
+**Version: `0.1.0-rc.2` · lightweight cross-device development and AI collaboration bridge**
 
 One native Go binary provides Server, Node and CLI modes; an embedded browser UI covers device pairing, service discovery, file sharing, messaging and audit. Human and Bot are independent identities with explicit permissions. Bot software can use the same CLI; no A2A or built-in Agent runtime.
 
@@ -34,7 +34,7 @@ Open `https://MAC_LAN_IP:7777` in a browser and enter the one-time login ticket.
 
 ## Native builds and releases
 
-Run GitHub Actions **Seven-Air-Link · Native multi-platform builds** manually for build artifacts, or push the bare tag `0.1.0-rc.1` to publish a prerelease containing macOS ARM/Intel, Windows x64 and Linux x64/ARM64 ZIPs. See [BUILD-ON-GITHUB.md](BUILD-ON-GITHUB.md). macOS and Windows builds require their own cgo/SQLite-native toolchains; the Linux build here cannot substitute for target-platform validation.
+GitHub Actions builds five native targets on main; the explicit release request creates an immutable RC tag and prerelease only after every build passes. Pushing a bare RC tag also triggers release builds containing macOS ARM/Intel, Windows x64 and Linux x64/ARM64 ZIPs. See [BUILD-ON-GITHUB.md](BUILD-ON-GITHUB.md). macOS and Windows builds require their own cgo/SQLite-native toolchains; the Linux build here cannot substitute for target-platform validation.
 
 ## Existing M4 implementation and compatibility
 
@@ -82,4 +82,4 @@ Maintenance commands `storage backup|verify|restore|migrate|gc|check` require Se
 
 ## Release limitations
 
-`0.1.0-rc.1` is a developer preview. Native GitHub macOS/Windows binaries have **not** been built or tested in this Linux container. Their publication requires successful GitHub Actions runs. Real Mac↔Windows networking, Windows ACLs, browser trust and security review remain separate release gates. No public internet exposure is supported by default.
+`0.1.0-rc.2` is a developer preview. Native GitHub macOS/Windows binaries have **not** been built or tested in this Linux container. Their publication requires successful GitHub Actions runs. Real Mac↔Windows networking, Windows ACLs, browser trust and security review remain separate release gates. No public internet exposure is supported by default.

@@ -87,3 +87,11 @@ func TestSQLiteConcurrentAndReadOnly(t *testing.T) {
 		}
 	}
 }
+
+// SQLite extension loading must remain disabled on every supported OS.
+func TestExtensionLoadingDisabledByDefault(t *testing.T) {
+ d, err := Open(filepath.Join(t.TempDir(), "no-extensions.db"), false)
+ if err != nil { t.Fatal(err) }
+ defer d.Close()
+ if _, err := d.Query("SELECT load_extension(?)", "untrusted-extension.so"); err == nil { t.Fatal("SQLite extension loading unexpectedly enabled") }
+}

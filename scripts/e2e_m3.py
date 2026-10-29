@@ -138,7 +138,7 @@ def suite(binary):
         assert h.cli('identity','whoami','--config',b,expect_ok=False)['error']['code']=='principal_inactive'
         record('linked device revocation disables Bot credentials and closes inbox subscription',elapsedSeconds=round(time.monotonic()-start,3))
         h.cli('file','send',source,'--to','shared','--config',human)
-        skill=h.cli('skill','show')['content'];assert '0.1.0-rc.1' in skill and '--incoming-only' in skill and 'Bridge never detects models' in skill
+        skill=h.cli('skill','show')['content'];assert '0.1.0-rc.2' in skill and '--incoming-only' in skill and 'Bridge never detects models' in skill
         record('embedded Skill matches working commands; no model runtime or Agent-specific protocol needed')
         return checks
     finally:

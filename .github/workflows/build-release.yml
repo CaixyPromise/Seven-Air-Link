@@ -152,3 +152,62 @@ jobs:
             release/*.zip release/*.zip.sha256 \
             --verify-tag --generate-notes --prerelease --latest=false \
             --title "Seven-Air-Link $GITHUB_REF_NAME"
+
+  publish_requested_rc:
+    name: Publish requested RC after five native builds
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Verify request and create immutable tag
+        id: release_ref
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          tag="$(cat .github/release-request.txt)"
+          [[ "$tag" =~ ^[0-9]+[.][0-9]+[.][0-9]+-rc[.][0-9]+$ ]]
+          binary_version="$(sed -n 's/^const Version = "\([^"]*\)"/\1/p' internal/model/model.go)"
+          test "$tag" = "$binary_version"
+          if gh api "repos/$GH_REPO/git/ref/tags/$tag" > /tmp/tag.json 2>/dev/null; then
+            test "$(jq -r '.object.sha' /tmp/tag.json)" = "$GITHUB_SHA" || {
+              echo "Refusing to move existing tag"; exit 1;
+            }
+          else
+            gh api -X POST "repos/$GH_REPO/git/refs" \
+              -f "ref=refs/tags/$tag" -f "sha=$GITHUB_SHA" >/dev/null
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+      - name: Download validated build archives
+        uses: actions/download-artifact@v4
+        with:
+          pattern: seven-air-link-*
+          path: release
+          merge-multiple: true
+      - name: Verify archives and publish prerelease
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ steps.release_ref.outputs.tag }}
+        run: |
+          set -euo pipefail
+          cd release
+          sha256sum -c ./*.zip.sha256
+          test "$(find . -name '*.zip' | wc -l)" -eq 5
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "Release already exists: leaving unchanged"
+            exit 0
+          fi
+          gh release create "$RELEASE_TAG" \
+            ./*.zip ./*.zip.sha256 \
+            --verify-tag --generate-notes --prerelease --latest=false \
+            --title "Seven-Air-Link $RELEASE_TAG"

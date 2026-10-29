@@ -21,3 +21,7 @@ The workflow checks the binary's embedded version/OS/arch, emits per-file and ar
 4. Visit **Actions** for build logs and **Releases** for platform ZIPs. If a job fails, no prerelease is created. Do not turn off checks to force publication.
 
 Do not commit `server.key`, `admin.json`, `bridge.db`, `.slb-server`, Bot/device config files or access tokens. These are operational secrets and are ignored by `.gitignore` in standard locations; check unusual paths before committing.
+
+## Release request after all native builds succeed
+
+The file .github/release-request.txt specifies the next RC version. Main branch CI builds all five platforms before creating its immutable tag and publishing the validated artifacts in one workflow. Existing tags are never overwritten.

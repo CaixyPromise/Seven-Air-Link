@@ -83,8 +83,8 @@ func Open(path string, readonly bool) (*DB, error) {
 	}
 	C.sqlite3_extended_result_codes(db.handle, 1)
 	C.sqlite3_busy_timeout(db.handle, 5000)
-	// Extension loading remains disabled; callers never receive a raw SQL endpoint.
-	C.sqlite3_enable_load_extension(db.handle, 0)
+	// SQLite disables extension loading by default. Some Apple SDK versions
+	// omit sqlite3_enable_load_extension; no code path enables extension loading.
 	if _, err = db.Exec("PRAGMA trusted_schema=OFF"); err != nil {
 		db.Close()
 		return nil, err

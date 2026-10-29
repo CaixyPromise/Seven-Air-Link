@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Seven-Air-Link M3",
-    "version": "0.1.0-rc.1",
+    "version": "0.1.0-rc.2",
     "description": "Implemented M1/M2 networking plus M3 Human/Bot collaboration. Browser, CLI and Bot use this same API. No Agent runtime, model execution or A2A. TLS is mandatory; Cookie mutations require same-origin and X-SLB-CSRF. Principal credentials never inherit bound Device permissions. JSON schema-3 storage, not SQLite. Independent HTTP Gateway origin and data-WS protocol remain documented in docs/PROTOCOL-M2.md. Detailed collaboration semantics: docs/CLI-M3.md."
   },
   "servers": [

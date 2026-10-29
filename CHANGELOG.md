@@ -2,6 +2,12 @@
 
 This project uses release candidate tags of the form `MAJOR.MINOR.PATCH-rc.N`.
 
+## 0.1.0-rc.2 — 2026-10-29
+
+- Fix macOS SQLite/cgo compatibility with Apple SDK headers.
+- Fix Windows directory sync compatibility, portable backup paths and test SQLite handle cleanup.
+- Add SQLite extension-loading regression test; preserve rc.1 unchanged.
+
 ## 0.1.0-rc.1 — 2026-10-29
 
 Initial Seven-Air-Link developer preview, renamed from Seven LAN Bridge.

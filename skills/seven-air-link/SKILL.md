@@ -3,7 +3,7 @@ name: seven-air-link
 description: Use Seven-Air-Link CLI to discover Human/Bot peers, exchange messages and files, inspect authorized services, and open local port mappings. No knowledge of the remote Agent implementation is needed.
 ---
 
-# Seven-Air-Link — version 0.1.0-rc.1
+# Seven-Air-Link — version 0.1.0-rc.2
 
 Use the private identity profile supplied by the user (`--config PROFILE`). Do not switch to the Owner or device profile to bypass denial. Never print, upload, paste into a message, or place credential tokens in command arguments. This skill is documentation; the server enforces authorization.
 

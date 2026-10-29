@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -263,7 +264,7 @@ func privateDir(path string) error {
 	return nil
 }
 func safeRelative(p string) bool {
-	if p == "" || strings.Contains(p, "\\") || filepath.IsAbs(p) || filepath.Clean(p) != p || p == ".." || strings.HasPrefix(p, "../") {
+	if p == "" || strings.Contains(p, "\\") || strings.Contains(p, ":") || path.IsAbs(p) || path.Clean(p) != p || p == ".." || strings.HasPrefix(p, "../") {
 		return false
 	}
 	if strings.HasPrefix(p, "uploads/") {

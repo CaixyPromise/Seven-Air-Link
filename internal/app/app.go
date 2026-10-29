@@ -27,7 +27,7 @@ import (
 	"time"
 )
 
-const help = `Seven-Air-Link 0.1.0-rc.1 — Human / Bot collaboration and local service networking
+const help = `Seven-Air-Link 0.1.0-rc.2 — Human / Bot collaboration and local service networking
 
 Usage:
   seven-air-link init [--data DIR] [--port 7777] [--tls-host HOST,IP]
