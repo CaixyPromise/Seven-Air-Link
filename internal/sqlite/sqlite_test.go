@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"testing"
 )
@@ -94,4 +95,29 @@ func TestExtensionLoadingDisabledByDefault(t *testing.T) {
  if err != nil { t.Fatal(err) }
  defer d.Close()
  if _, err := d.Query("SELECT load_extension(?)", "untrusted-extension.so"); err == nil { t.Fatal("SQLite extension loading unexpectedly enabled") }
+}
+
+func TestSQLiteMacOSParentSymlink(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("macOS path semantics")
+	}
+	root := t.TempDir()
+	actual := filepath.Join(root, "real")
+	if err := os.Mkdir(actual, 0700); err != nil {
+		t.Fatal(err)
+	}
+	alias := filepath.Join(root, "alias")
+	if err := os.Symlink(actual, alias); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+	db, err := Open(filepath.Join(alias, "bridge.db"), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(actual, "bridge.db")); err != nil {
+		t.Fatal(err)
+	}
 }

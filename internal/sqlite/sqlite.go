@@ -46,6 +46,16 @@ func Open(path string, readonly bool) (*DB, error) {
 	if err != nil {
 		return nil, err
 	}
+	// SQLITE_OPEN_NOFOLLOW rejects symlinks in parent components too.
+	// macOS commonly exposes /var through /private/var. Resolve the
+	// existing parent but still reject symlinks at the database filename.
+	if runtime.GOOS == "darwin" {
+		resolved, e := filepath.EvalSymlinks(filepath.Dir(path))
+		if e != nil {
+			return nil, e
+		}
+		path = filepath.Join(resolved, filepath.Base(path))
+	}
 	fi, err := os.Lstat(path)
 	if err != nil && !os.IsNotExist(err) {
 		return nil, err
