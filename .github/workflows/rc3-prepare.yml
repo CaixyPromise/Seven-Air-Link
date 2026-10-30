@@ -1,0 +1,71 @@
+name: Prepare and verify rc.3 integration
+on:
+  push:
+    branches: ['work/rc3-password-notepad']
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: write
+concurrency:
+  group: rc3-integration
+  cancel-in-progress: false
+jobs:
+  integrate:
+    if: github.ref == 'refs/heads/work/rc3-password-notepad'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v6
+        with:
+          go-version: stable
+          cache: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Check unchanged main baseline
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test "$(gh api repos/${{ github.repository }}/git/ref/heads/main --jq '.object.sha')" = 937ae34c5436c445c6715539bfdfbd3da847c6a2
+      - name: Integrate and run native regression suite
+        env:
+          CGO_ENABLED: '1'
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y build-essential libsqlite3-dev
+          python scripts/rc3_materialize.py
+          go test -count=1 ./...
+          go vet ./...
+          mkdir -p bin reports
+          go build -buildvcs=false -trimpath -o bin/seven-air-link ./cmd/seven-air-link
+          python -m pip install 'websockets==16.0'
+          python scripts/e2e.py --binary bin/seven-air-link
+          python scripts/e2e_m2.py --binary bin/seven-air-link
+          python scripts/e2e_m3.py --binary bin/seven-air-link
+          python scripts/e2e_rc3.py --binary bin/seven-air-link
+          python scripts/pty_rc3.py --binary bin/seven-air-link
+      - name: Save regression evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rc3-integration-evidence
+          path: reports/
+          if-no-files-found: warn
+      - name: Commit tested source and trigger release gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          test "$(gh api repos/$GH_REPO/git/ref/heads/main --jq '.object.sha')" = 937ae34c5436c445c6715539bfdfbd3da847c6a2
+          git rm scripts/rc3_materialize.py .github/workflows/rc3-prepare.yml
+          git add .
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'feat: fixed Web password and revision-safe shared notepad (rc.3)'
+          git push origin HEAD:main
+          gh api -X POST "repos/$GH_REPO/actions/workflows/build-release.yml/dispatches" -f ref=main
