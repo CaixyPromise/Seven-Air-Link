@@ -4,7 +4,7 @@ package model
 import "time"
 
 const Protocol = 1
-const Version = "0.1.0-rc.2"
+const Version = "0.1.0-rc.3"
 
 type Device struct {
 	ID          string     `json:"id"`

@@ -62,7 +62,7 @@ func newRig(t *testing.T) *rig {
 	if e != nil {
 		t.Fatal(e)
 	}
-	t.Cleanup(func() { s.Close(); c.Close(); h.Close() })
+	t.Cleanup(func() { s.Close(); c.Close(); h.Close(); st.Close() })
 	return &rig{s, h, st, cfg, c, token}
 }
 func (r *rig) join(t *testing.T, name string) model.Config {
@@ -323,7 +323,7 @@ func TestStorageDiagnosticsOwnerOnly(t *testing.T) {
 	if e := r.c.Do(context.Background(), "GET", "/api/v1/storage", nil, &stats); e != nil {
 		t.Fatal(e)
 	}
-	if stats["engine"] != "sqlite" || stats["schema"] != float64(4) {
+	if stats["engine"] != "sqlite" || stats["schema"] != float64(store.SchemaVersion) {
 		t.Fatal(stats)
 	}
 	cfg := r.join(t, "storage-device")

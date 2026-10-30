@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Seven-Air-Link M3",
-    "version": "0.1.0-rc.2",
+    "version": "0.1.0-rc.3",
     "description": "Implemented M1/M2 networking plus M3 Human/Bot collaboration. Browser, CLI and Bot use this same API. No Agent runtime, model execution or A2A. TLS is mandatory; Cookie mutations require same-origin and X-SLB-CSRF. Principal credentials never inherit bound Device permissions. JSON schema-3 storage, not SQLite. Independent HTTP Gateway origin and data-WS protocol remain documented in docs/PROTOCOL-M2.md. Detailed collaboration semantics: docs/CLI-M3.md."
   },
   "servers": [
@@ -363,6 +363,24 @@
           },
           "default": {
             "description": "Structured error; non-2xx never means success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "List only current Principal Web sessions, never tokens",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Structured non-2xx error",
             "content": {
               "application/json": {
                 "schema": {
@@ -1701,6 +1719,271 @@
           }
         }
       }
+    },
+    "/api/v1/auth/methods": {
+      "get": {
+        "summary": "Public enabled login methods; no credentials/hashes",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Structured non-2xx error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/v1/sessions/password": {
+      "post": {
+        "summary": "Owner password login; Secure HttpOnly SameSite session, maximum 8h; rate limited",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Structured non-2xx error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordLogin"
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/v1/auth/password": {
+      "get": {
+        "summary": "Owner password enabled/revision status; never hash",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Structured non-2xx error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Owner set/reset; current password required for browser changes; revoke Owner Web sessions",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Structured non-2xx error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordChange"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Owner disable password; retain ticket recovery, not anonymous access",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Structured non-2xx error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordChange"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sessions/{id}": {
+      "delete": {
+        "summary": "Revoke own Web session or literal all",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Structured non-2xx error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/note": {
+      "get": {
+        "summary": "Single workspace-shared note, active Human/Bot only",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharedNote"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Structured non-2xx error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Required baseRevision CAS; atomic note and metadata-only audit",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharedNote"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Structured non-2xx error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "note_revision_conflict with current note; caller preserves/reconciles draft",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "$ref": "#/components/schemas/Error"
+                    },
+                    "note": {
+                      "$ref": "#/components/schemas/SharedNote"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoteWrite"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/note/events": {
+      "get": {
+        "summary": "Authenticated latest-snapshot SSE: note.snapshot/note.updated; not a historical log",
+        "responses": {
+          "200": {
+            "description": "SharedNote payload; revisions as SSE IDs; session.expired ends revoked auth",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Structured non-2xx error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2562,6 +2845,89 @@
           "recipientId",
           "createdAt"
         ]
+      },
+      "SharedNote": {
+        "type": "object",
+        "required": [
+          "id",
+          "text",
+          "revision",
+          "updatedBy"
+        ],
+        "properties": {
+          "id": {
+            "const": "shared"
+          },
+          "text": {
+            "type": "string",
+            "description": "Full raw UTF-8 text, at most 65536 bytes"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "updatedBy": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "NoteWrite": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "text",
+          "baseRevision"
+        ],
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "baseRevision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "correlationId": {
+            "type": "string",
+            "maxLength": 128
+          }
+        }
+      },
+      "PasswordLogin": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "password"
+        ],
+        "properties": {
+          "password": {
+            "type": "string",
+            "writeOnly": true,
+            "maxLength": 1024
+          }
+        }
+      },
+      "PasswordChange": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "password": {
+            "type": "string",
+            "writeOnly": true,
+            "minLength": 12,
+            "maxLength": 1024
+          },
+          "currentPassword": {
+            "type": "string",
+            "writeOnly": true
+          }
+        }
       }
     }
   },
@@ -2575,6 +2941,7 @@
     "JSON schema 3; SQLite and legacy Python import remain deferred.",
     "No AI task execution, delivery/read receipts, model wakeup or Agent protocol.",
     "M2 local Node approval and explicit service ACL are unchanged.",
-    "Linux local test evidence is not macOS/Windows native acceptance or production security audit."
+    "Linux local test evidence is not macOS/Windows native acceptance or production security audit.",
+    "rc.3 schema 5: fixed Owner Web password and shared note; no Agent runtime"
   ]
 }

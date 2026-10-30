@@ -14,5 +14,7 @@ python3 scripts/test_legacy.py >reports/legacy-tests.log 2>&1
 python3 scripts/e2e.py --binary bin/seven-air-link >reports/e2e.log 2>&1
 python3 scripts/e2e_m2.py --binary bin/seven-air-link >reports/m2-e2e.log 2>&1
 python3 scripts/e2e_m3.py --binary bin/seven-air-link >reports/m3-e2e.log 2>&1
+python3 scripts/e2e_rc3.py --binary bin/seven-air-link >reports/rc3-e2e.log 2>&1
+python3 scripts/pty_rc3.py --binary bin/seven-air-link >reports/rc3-pty.log 2>&1
 python3 scripts/interop_test.py --binary bin/seven-air-link >reports/interop.log 2>&1
 printf 'M1 + M2 + M3 regression on SQLite passed. Browser checks are separate.\n'

@@ -2,6 +2,17 @@
 
 This project uses release candidate tags of the form `MAJOR.MINOR.PATCH-rc.N`.
 
+## 0.1.0-rc.3 — 2026-10-30
+
+- Fixed Owner Web password login, salted PBKDF2-HMAC-SHA256/600000, no-echo CLI
+  setup/reset, rate limits, bounded verification and scoped session revocation.
+- Keep ticket login, Node pairing and independent Human/Bot credentials.
+- Restore shared notepad: autosave, SSE, SQLite, required revision CAS and
+  conflict drafts, with normal Human/Bot CLI/API access.
+- Transactional schema 4→5 upgrade; backup/restore preserves both new resources.
+- Add API, concurrency, failure injection, process, terminal and browser tests.
+- Existing tags remain unchanged. Auto-open convenience command is not included.
+
 ## 0.1.0-rc.2 — 2026-10-29
 
 - Fix macOS SQLite/cgo compatibility with Apple SDK headers.

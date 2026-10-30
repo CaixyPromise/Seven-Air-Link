@@ -392,7 +392,7 @@ func TestM2MigrationAndCorruptStoreFailClosed(t *testing.T) {
 		t.Fatal(e)
 	}
 	defer reopened.Close()
-	if reopened.s.Version != 4 || report.SourceVersion != 2 {
+	if reopened.s.Version != SchemaVersion || report.SourceVersion != 2 {
 		t.Fatal("not migrated", report)
 	}
 	if _, e = reopened.Auth(token); e != nil {

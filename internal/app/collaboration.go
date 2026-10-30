@@ -20,7 +20,7 @@ import (
 
 func localValueFlag(s string) bool {
 	switch s {
-	case "--text", "--name", "--from", "--to", "--type", "--device", "--out", "--ttl", "--fingerprint", "--code-file", "--idempotency-key", "--reply-to", "--correlation-id", "--attach", "--with", "--after", "--before", "--limit", "--cursor", "--cursor-file", "--timeout", "--max-messages", "--listen", "--port", "--proxy-listen", "--data", "--tls-host", "--heartbeat", "--offline-after", "--max-devices", "--connect-timeout", "--max-tunnels", "--max-per-service", "--max-per-actor", "--target", "--allow-devices", "--allow-principals", "--actor", "--correlation":
+	case "--revision", "--file", "--max-updates", "--text", "--name", "--from", "--to", "--type", "--device", "--out", "--ttl", "--fingerprint", "--code-file", "--idempotency-key", "--reply-to", "--correlation-id", "--attach", "--with", "--after", "--before", "--limit", "--cursor", "--cursor-file", "--timeout", "--max-messages", "--listen", "--port", "--proxy-listen", "--data", "--tls-host", "--heartbeat", "--offline-after", "--max-devices", "--connect-timeout", "--max-tunnels", "--max-per-service", "--max-per-actor", "--target", "--allow-devices", "--allow-principals", "--actor", "--correlation":
 		return true
 	}
 	return false

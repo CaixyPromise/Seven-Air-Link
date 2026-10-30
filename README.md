@@ -1,10 +1,26 @@
 # Seven-Air-Link
 
-**Version: `0.1.0-rc.2` · lightweight cross-device development and AI collaboration bridge**
+**Version: `0.1.0-rc.3` · lightweight cross-device development and AI collaboration bridge**
 
 One native Go binary provides Server, Node and CLI modes; an embedded browser UI covers device pairing, service discovery, file sharing, messaging and audit. Human and Bot are independent identities with explicit permissions. Bot software can use the same CLI; no A2A or built-in Agent runtime.
 
 **Default HTTPS/API port: `7777`.** Optional isolated HTTP reverse-proxy HTTPS port: `7778` (`--proxy-listen`). All cross-device connections use TLS. Do **not** expose the RC service to the public internet.
+
+## Password login and shared notepad (rc.3)
+
+Start the Server, then in another terminal set its Owner Web password once:
+
+```bash
+./seven-air-link auth password set --config ./server-data/admin.json
+```
+
+Windows opens `https://MAC_IP:7777` and uses **密码登录**. Input is hidden in
+terminal prompts. Tickets remain supported; Node pairing and Bot identities
+stay independent. The password authenticates Owner, so share it only with
+trusted administrators. **共享便签** provides autosave, SSE, SQLite persistence
+and conflict protection. Human/Bot use `note get|set|watch` with explicit revisions.
+Read [rc.3 upgrade and usage](docs/RC3.md), back up before schema 4→5 migration,
+and see [third-party notices](THIRD-PARTY-NOTICES.md). No default password.
 
 ## Quick start: Mac Server → Windows Node
 
@@ -38,7 +54,7 @@ GitHub Actions builds five native targets on main; the explicit release request 
 
 ## Existing M4 implementation and compatibility
 
-This prerelease repackages the tested M4 functionality without replacing the database schema or re-authorizing existing identities. Earlier M3/M4 milestones are retained as [implementation history](docs/M4-IMPLEMENTATION-HISTORY.md), **not part of the version/tag**. Existing service/device credential files remain valid when given explicitly via `--data` and `--config`; new default configuration directories use the Seven-Air-Link name. Back up Server keys and database before any upgrade.
+This prerelease retains the previous identity/network functionality and adds a transactional SQLite schema 4→5 migration for passwords and notes. Existing identities are not re-authorized. Earlier M3/M4 milestones are retained as [implementation history](docs/M4-IMPLEMENTATION-HISTORY.md), **not part of the version/tag**. Existing service/device credential files remain valid when given explicitly via `--data` and `--config`; new default configuration directories use the Seven-Air-Link name. Back up Server keys and database before any upgrade.
 
 ---
 
@@ -82,4 +98,4 @@ Maintenance commands `storage backup|verify|restore|migrate|gc|check` require Se
 
 ## Release limitations
 
-`0.1.0-rc.2` is a developer preview. Native GitHub macOS/Windows binaries have **not** been built or tested in this Linux container. Their publication requires successful GitHub Actions runs. Real Mac↔Windows networking, Windows ACLs, browser trust and security review remain separate release gates. No public internet exposure is supported by default.
+`0.1.0-rc.3` is a developer preview. Native GitHub macOS/Windows binaries have **not** been built or tested in this Linux container. Their publication requires successful GitHub Actions runs. Real Mac↔Windows networking, Windows ACLs, browser trust and security review remain separate release gates. No public internet exposure is supported by default.

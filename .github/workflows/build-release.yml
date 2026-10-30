@@ -102,6 +102,28 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Windows native build failed" }
           if (-not (Test-Path ./dist/seven-air-link-windows-amd64.exe)) { throw 'Missing Windows executable' }
           if (-not (Test-Path ./dist/libsqlite3-0.dll)) { throw 'Missing SQLite DLL' }
+      - name: Real password/notepad process and browser acceptance
+        if: matrix.platform == 'linux-amd64'
+        shell: bash
+        env:
+          CGO_ENABLED: '1'
+        run: |
+          set -euo pipefail
+          mkdir -p reports
+          go test -race -count=1 ./... > reports/rc3-race.log 2>&1
+          python scripts/e2e_rc3.py --binary dist/seven-air-link-linux-amd64
+          python scripts/pty_rc3.py --binary dist/seven-air-link-linux-amd64
+          python -m pip install 'playwright==1.57.0'
+          python -m playwright install --with-deps chromium
+          python scripts/ui_rc3_test.py --binary dist/seven-air-link-linux-amd64
+      - name: Upload rc.3 acceptance evidence
+        if: always() && matrix.platform == 'linux-amd64'
+        uses: actions/upload-artifact@v4
+        with:
+          name: rc3-acceptance-evidence
+          path: reports/
+          if-no-files-found: warn
+          retention-days: 30
       - name: Package release archive (verified OS/arch/version)
         shell: bash
         env:

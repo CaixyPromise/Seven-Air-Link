@@ -31,8 +31,8 @@ $env:GOPROXY = 'off'
 $env:GOSUMDB = 'off'
 Write-Host "Building Seven-Air-Link on Windows/amd64 using $(go version) and $gcc"
 New-Item -ItemType Directory -Force -Path dist | Out-Null
-go test ./internal/sqlite ./internal/store
-if ($LASTEXITCODE -ne 0) { throw 'SQLite/store tests failed.' }
+go test ./...
+if ($LASTEXITCODE -ne 0) { throw 'Native Go tests failed.' }
 $out = Join-Path (Get-Location) 'dist\seven-air-link-windows-amd64.exe'
 go build -buildvcs=false -trimpath -ldflags='-s -w' -o $out ./cmd/seven-air-link
 if ($LASTEXITCODE -ne 0) { throw 'Go build failed.' }

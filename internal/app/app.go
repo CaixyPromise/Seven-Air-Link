@@ -27,7 +27,7 @@ import (
 	"time"
 )
 
-const help = `Seven-Air-Link 0.1.0-rc.2 — Human / Bot collaboration and local service networking
+const help = `Seven-Air-Link 0.1.0-rc.3 — Human / Bot collaboration and local service networking
 
 Usage:
   seven-air-link init [--data DIR] [--port 7777] [--tls-host HOST,IP]
@@ -91,12 +91,21 @@ M3 collaboration (Human and Bot share the same API; no Agent runtime):
   file send PATH [--to shared|PRINCIPAL_ID] --config PROFILE
   file list | file get FILE_ID --out PATH | file delete FILE_ID
   skill show
+  auth password set [--password-stdin] [--data DIR | --config OWNER_JSON]
+  auth password status|disable --yes --config OWNER_JSON
+  auth sessions list|revoke SESSION_ID|all --config PROFILE
+  note get --config PROFILE
+  note set --revision N (--text TEXT | --stdin | --file PATH) --config PROFILE
+  note watch [--timeout 30s] [--max-updates N] --config PROFILE --output ndjson
 Network service ACL additionally supports --allow-principals PRINCIPAL_ID,...
 Identity creation requires Owner; member credentials do not inherit administration.
 Messages are durable acceptance, NOT confirmation that another AI executed a task.
 `
 
-type options struct{ config, server, output string }
+type options struct {
+	config, server, output string
+	configExplicit         bool
+}
 type application struct {
 	in       io.Reader
 	out, err io.Writer
@@ -111,6 +120,7 @@ func common(args []string) ([]string, options, error) {
 		var p *string
 		switch key {
 		case "--config":
+			o.configExplicit = true
 			p = &o.config
 		case "--server":
 			p = &o.server
@@ -150,6 +160,15 @@ func Run(ctx context.Context, args []string, in io.Reader, out, errout io.Writer
 	}
 	if errors.Is(e, context.Canceled) {
 		return 0
+	}
+	var conflict *noteConflictError
+	if errors.As(e, &conflict) {
+		if opt.output == "json" || opt.output == "ndjson" {
+			_ = json.NewEncoder(out).Encode(map[string]any{"error": conflict.API, "note": conflict.Note})
+		} else {
+			fmt.Fprintln(errout, "Error:", e, "; read the latest note before retrying")
+		}
+		return 1
 	}
 	var storageErr *storageCheckError
 	if errors.As(e, &storageErr) {
@@ -204,6 +223,10 @@ func (a *application) run(ctx context.Context, args []string) error {
 		return e
 	}
 	switch args[0] {
+	case "auth":
+		return a.authCommand(ctx, args[1:])
+	case "note":
+		return a.note(ctx, args[1:])
 	case "version":
 		if len(args) > 1 {
 			return errors.New("version takes no arguments")

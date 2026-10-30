@@ -50,10 +50,12 @@ def main():
             parser.error(f'missing runtime SQLite DLL: {dll}')
         for dep in sorted((ROOT / 'dist').glob('*.dll')):
             content.append((dep.name, dep))
-    for name in ('README.md', 'START-MAC-WINDOWS.md'):
+    for name in ('README.md', 'START-MAC-WINDOWS.md', 'LICENSE', 'THIRD-PARTY-NOTICES.md', 'docs/RC3.md'):
         src = ROOT / name
         if src.exists():
             content.append((name, src))
+
+    content.append(('licenses/pbkdf2-LICENSE', ROOT / 'internal/thirdparty/pbkdf2/LICENSE'))
 
     manifest = []
     with zipfile.ZipFile(archive, 'w', compression=zipfile.ZIP_DEFLATED, compresslevel=8) as z:

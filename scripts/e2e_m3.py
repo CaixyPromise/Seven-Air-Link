@@ -103,7 +103,7 @@ def suite(binary):
         assert h.cli('message','get',msg['id'],'--config',b)['text']==text
         h.cli('file','get',attachment['id'],'--out',h.root/'after-restart.bin','--config',b)
         assert (h.root/'after-restart.bin').read_bytes()==payload
-        assert sqlite3.connect(h.data/'bridge.db').execute('PRAGMA user_version').fetchone()[0]==4
+        assert sqlite3.connect(h.data/'bridge.db').execute('PRAGMA user_version').fetchone()[0]==5
         record('SIGKILL/restart preserves identity, private history, file bytes and Node authorization')
         # Principal grants use the existing M2 protocol, not a special Agent path.
         echo=spawn_server(ThreadedTCP(('127.0.0.1',0),Echo));servers.append(echo)
@@ -138,7 +138,7 @@ def suite(binary):
         assert h.cli('identity','whoami','--config',b,expect_ok=False)['error']['code']=='principal_inactive'
         record('linked device revocation disables Bot credentials and closes inbox subscription',elapsedSeconds=round(time.monotonic()-start,3))
         h.cli('file','send',source,'--to','shared','--config',human)
-        skill=h.cli('skill','show')['content'];assert '0.1.0-rc.2' in skill and '--incoming-only' in skill and 'Bridge never detects models' in skill
+        skill=h.cli('skill','show')['content'];assert '0.1.0-rc.3' in skill and '--incoming-only' in skill and 'Bridge never detects models' in skill
         record('embedded Skill matches working commands; no model runtime or Agent-specific protocol needed')
         return checks
     finally:

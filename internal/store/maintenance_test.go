@@ -241,7 +241,9 @@ func TestBackupRejectsPathTraversalAndSymlink(t *testing.T) {
 	rogue := filepath.Join(backup, "surprise")
 	if e := os.Symlink(filepath.Join(dir, "admin.json"), rogue); e != nil {
 		t.Logf("symlink unavailable, testing unlisted regular file: %v", e)
-		if e = os.WriteFile(rogue, []byte("unexpected"), 0600); e != nil { t.Fatal(e) }
+		if e = os.WriteFile(rogue, []byte("unexpected"), 0600); e != nil {
+			t.Fatal(e)
+		}
 	}
 	if _, e := VerifyBackup(backup); e == nil {
 		t.Fatal("unexpected symlink accepted")
@@ -269,7 +271,9 @@ func TestGCPreviewApplyAndReferenceSafety(t *testing.T) {
 	link := filepath.Join(st.FileDir(), ".upload-link")
 	if e := os.Symlink(outside, link); e != nil {
 		t.Logf("symlink unavailable, testing unknown file preservation: %v", e)
-		if e = os.WriteFile(link, []byte("unknown"), 0600); e != nil { t.Fatal(e) }
+		if e = os.WriteFile(link, []byte("unknown"), 0600); e != nil {
+			t.Fatal(e)
+		}
 	}
 	r, e := st.GC(24*time.Hour, false)
 	if e != nil || len(r.Candidates) != 3 || r.Removed != 0 {
@@ -363,10 +367,14 @@ func TestBackupDestinationSymlinkCannotEscapeAncestryCheck(t *testing.T) {
 
 // Portable backup names must be slash-separated, even on Windows.
 func TestBackupManifestPortablePaths(t *testing.T) {
- for _, name := range []string{"bridge.db","metadata.json","server.key","uploads/file_ABCDEFGHIJKLMNOPQRSTUVWX"} {
-  if !safeRelative(name) { t.Fatalf("rejected valid backup name %q",name) }
- }
- for _, name := range []string{"",".","..","../server.key","/etc/passwd","C:/Windows/system.ini","uploads\\file_ABCDEFGHIJKLMNOPQRSTUVWX","uploads/../server.key","uploads//file_ABCDEFGHIJKLMNOPQRSTUVWX","unlisted.txt"} {
-  if safeRelative(name) { t.Fatalf("accepted unsafe backup name %q",name) }
- }
+	for _, name := range []string{"bridge.db", "metadata.json", "server.key", "uploads/file_ABCDEFGHIJKLMNOPQRSTUVWX"} {
+		if !safeRelative(name) {
+			t.Fatalf("rejected valid backup name %q", name)
+		}
+	}
+	for _, name := range []string{"", ".", "..", "../server.key", "/etc/passwd", "C:/Windows/system.ini", "uploads\\file_ABCDEFGHIJKLMNOPQRSTUVWX", "uploads/../server.key", "uploads//file_ABCDEFGHIJKLMNOPQRSTUVWX", "unlisted.txt"} {
+		if safeRelative(name) {
+			t.Fatalf("accepted unsafe backup name %q", name)
+		}
+	}
 }

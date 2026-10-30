@@ -83,7 +83,9 @@ func readLegacy(path string) (snapshot, []byte, error) {
 func syncDir(dir string) error {
 	// Windows does not support fsync on directory handles via os.File.Sync.
 	// Data files are synced before rename; directory sync is best-effort.
-	if runtime.GOOS == "windows" { return nil }
+	if runtime.GOOS == "windows" {
+		return nil
+	}
 	f, e := os.Open(dir)
 	if e != nil {
 		return e

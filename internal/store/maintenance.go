@@ -50,7 +50,7 @@ func (st *Store) Stats() (StorageReport, error) {
 	return st.statsLocked()
 }
 func (st *Store) statsLocked() (StorageReport, error) {
-	r := StorageReport{OK: true, Engine: "sqlite", SQLiteVersion: sqlite.Version(), Schema: 4, Integrity: "not_run", Messages: st.s.MessageSeq, MessageBytes: st.s.MessageBytes, EventSeq: st.s.Seq, FileIssues: []FileIssue{}}
+	r := StorageReport{OK: true, Engine: "sqlite", SQLiteVersion: sqlite.Version(), Schema: st.s.Version, Integrity: "not_run", Messages: st.s.MessageSeq, MessageBytes: st.s.MessageBytes, EventSeq: st.s.Seq, FileIssues: []FileIssue{}}
 	if _, e := st.db.Query("SELECT 1 FROM server_state"); e != nil {
 		return r, e
 	}
@@ -386,7 +386,7 @@ func Backup(data, dest string) (BackupReport, error) {
 	var snap snapshot
 	dbpath := filepath.Join(data, "bridge.db")
 	if _, e = os.Stat(dbpath); e == nil {
-		st, e := Open(dbpath)
+		st, e := openDBMode(dbpath, false)
 		if e != nil {
 			return r, e
 		}
@@ -396,7 +396,7 @@ func Backup(data, dest string) (BackupReport, error) {
 			return r, fmt.Errorf("source storage invalid: %v; issues=%v", e, check.FileIssues)
 		}
 		snap = st.s
-		manifest.Schema = 4
+		manifest.Schema = st.s.Version
 		target := filepath.Join(stage, "bridge.db")
 		// SQLite NOFOLLOW also checks VACUUM INTO output path components.
 		// Canonicalize the private stage: macOS /var links to /private/var.
@@ -529,7 +529,7 @@ func VerifyBackup(dir string) (BackupReport, error) {
 	if e = json.Unmarshal(raw, &m); e != nil {
 		return r, e
 	}
-	if m.Format != 1 || m.Schema < 1 || m.Schema > 4 || len(m.Files) > 5000 {
+	if m.Format != 1 || m.Schema < 1 || m.Schema > SchemaVersion || len(m.Files) > 5000 {
 		return r, errors.New("unsupported backup manifest")
 	}
 	listed := map[string]bool{"manifest.json": true}
@@ -564,7 +564,7 @@ func VerifyBackup(dir string) (BackupReport, error) {
 		return r, e
 	}
 	var snap snapshot
-	if m.Schema == 4 {
+	if m.Schema >= 4 {
 		db, e := sqlite.Open(filepath.Join(dir, "bridge.db"), true)
 		if e != nil {
 			return r, e

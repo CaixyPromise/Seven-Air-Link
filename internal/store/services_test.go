@@ -107,7 +107,7 @@ func TestM1MetadataMigrationBackup(t *testing.T) {
 		t.Fatal(e)
 	}
 	defer up.Close()
-	if up.s.Version != 4 || up.s.Services == nil {
+	if up.s.Version != SchemaVersion || up.s.Services == nil {
 		t.Fatal("not upgraded")
 	}
 	old, e := os.ReadFile(report.Backup)

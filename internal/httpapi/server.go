@@ -39,19 +39,25 @@ type online struct {
 	ip, session string
 }
 type browserTicket struct {
-	expires time.Time
-	subject store.Subject
+	webRevision int64
+	expires     time.Time
+	subject     store.Subject
 }
 type browserSession struct {
-	subject store.Subject
-	expires time.Time
-	csrf    string
+	id, method, ip, userAgent string
+	created                   time.Time
+	webRevision               int64
+	subject                   store.Subject
+	expires                   time.Time
+	csrf                      string
 }
 type rateWindow struct {
 	start time.Time
 	n     int
 }
 type Server struct {
+	passwordSlots      chan struct{}
+	noteCount          map[string]int
 	bootID             string
 	st                 *store.Store
 	tunnels            map[string]*activeTunnel
@@ -101,7 +107,7 @@ func New(st *store.Store, cert *x509.Certificate, opt Options) (*Server, error) 
 		opt.MaxPerActor = 128
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	s := &Server{st: st, opt: opt, pin: secure.Fingerprint(cert.Raw), hosts: map[string]bool{}, nodes: map[string]*online{}, tickets: map[string]browserTicket{}, inboxCount: map[string]int{}, activityCount: map[string]int{}, uploadSlots: make(chan struct{}, 4), sessions: map[string]browserSession{}, rates: map[string]rateWindow{}, ctx: ctx, cancel: cancel}
+	s := &Server{passwordSlots: make(chan struct{}, 2), noteCount: map[string]int{}, st: st, opt: opt, pin: secure.Fingerprint(cert.Raw), hosts: map[string]bool{}, nodes: map[string]*online{}, tickets: map[string]browserTicket{}, inboxCount: map[string]int{}, activityCount: map[string]int{}, uploadSlots: make(chan struct{}, 4), sessions: map[string]browserSession{}, rates: map[string]rateWindow{}, ctx: ctx, cancel: cancel}
 	for _, h := range cert.DNSNames {
 		s.hosts[strings.ToLower(h)] = true
 	}
@@ -234,7 +240,7 @@ func (s *Server) auth(r *http.Request) (store.Subject, string, error) {
 		return store.Subject{}, "", store.ErrAuth
 	}
 	sub := bs.subject
-	if !s.st.Active(sub) {
+	if !s.st.Active(sub) || bs.webRevision != s.ownerWebRevision(sub) {
 		return store.Subject{}, "", store.ErrPrincipalInactive
 	}
 	return sub, bs.csrf, nil
@@ -264,7 +270,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if r.URL.RawQuery != "" {
 		q := r.URL.Query()
-		for _, k := range []string{"token", "authorization", "code", "ticket"} {
+		for _, k := range []string{"token", "authorization", "code", "ticket", "password"} {
 			if q.Has(k) {
 				s.deny(w, r, 400, "credential_in_url", "credentials are not accepted in URLs")
 				return
@@ -274,6 +280,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
 	if r.Method == "GET" {
 		switch path {
+		case "/api/v1/auth/methods":
+			jsonReply(w, 200, map[string]any{"password": s.st.WebPasswordStatus().Enabled, "ticket": true, "passwordIdentity": "owner"})
+			return
 		case "/healthz":
 			jsonReply(w, 200, map[string]any{"ok": true})
 			return
@@ -287,7 +296,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		case "/api/v1/info":
 			jsonReply(w, 200, map[string]any{"name": "Seven-Air-Link", "version": model.Version, "releaseChannel": "rc", "proxyPort": s.proxyPort, "bootId": s.bootID, "protocol": model.Protocol, "fingerprint": s.pin})
 			return
-		case "/", "/index.html", "/app.js", "/collaboration.js", "/maintenance.js", "/style.css":
+		case "/", "/index.html", "/app.js", "/collaboration.js", "/maintenance.js", "/notes.js", "/auth.js", "/style.css":
 			name := strings.TrimPrefix(path, "/")
 			if name == "" {
 				name = "index.html"
@@ -312,7 +321,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if r.Method != "GET" && path != "/api/v1/tunnels" && path != "/api/v1/messages" && path != "/api/v1/files" && !strings.HasPrefix(path, "/api/v1/forwards") && !s.allowedRate(remoteIP(r)) {
+	if r.Method != "GET" && path != "/api/v1/note" && path != "/api/v1/tunnels" && path != "/api/v1/messages" && path != "/api/v1/files" && !strings.HasPrefix(path, "/api/v1/forwards") && !s.allowedRate(remoteIP(r)) {
 		w.Header().Set("Retry-After", "60")
 		s.deny(w, r, 429, "rate_limited", "too many mutations or login attempts from this address")
 		return
@@ -323,6 +332,10 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if path == "/api/v1/join" && r.Method == "POST" {
 		s.join(w, r)
+		return
+	}
+	if path == "/api/v1/sessions/password" && r.Method == "POST" {
+		s.loginPassword(w, r)
 		return
 	}
 	if path == "/api/v1/sessions" && r.Method == "POST" {
@@ -391,6 +404,12 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		s.control(w, r, sub)
+		return
+	}
+	if s.authSettingsRoute(w, r, sub) {
+		return
+	}
+	if s.noteRoute(w, r, sub) {
 		return
 	}
 	if s.collaborationRoute(w, r, sub) {
@@ -676,7 +695,7 @@ func (s *Server) createTicket(w http.ResponseWriter, r *http.Request, sub store.
 		s.deny(w, r, 429, "ticket_quota", "too many pending browser tickets")
 		return
 	}
-	s.tickets[secure.Hash(ticket)] = browserTicket{expires: exp, subject: sub}
+	s.tickets[secure.Hash(ticket)] = browserTicket{expires: exp, subject: sub, webRevision: s.ownerWebRevision(sub)}
 	s.authMu.Unlock()
 	s.audit(model.Event{ActorID: sub.ID, Action: "browser.ticket_created", Result: "success", RequestID: w.Header().Get("X-Request-ID")})
 	jsonReply(w, 201, map[string]any{"ticket": ticket, "expiresAt": exp, "note": "single-use browser login; do not place it in a URL"})
@@ -688,27 +707,23 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	if !s.body(w, r, &q) {
 		return
 	}
-	token := secure.Random("browser_")
-	csrf := secure.Random("csrf_")
-	now := time.Now()
 	s.authMu.Lock()
-	for k, bs := range s.sessions {
-		if now.After(bs.expires) {
-			delete(s.sessions, k)
-		}
-	}
-	exp, ok := s.tickets[secure.Hash(q.Ticket)]
-	if !ok || now.After(exp.expires) || !s.st.Active(exp.subject) || len(s.sessions) >= 64 {
+	t, ok := s.tickets[secure.Hash(q.Ticket)]
+	if !ok || time.Now().After(t.expires) || !s.st.Active(t.subject) || t.webRevision != s.ownerWebRevision(t.subject) {
 		s.authMu.Unlock()
 		s.deny(w, r, 403, "ticket_invalid_or_expired", "create a new one-time ticket using login create")
 		return
 	}
-	delete(s.tickets, secure.Hash(q.Ticket))
-	s.sessions[secure.Hash(token)] = browserSession{expires: now.Add(8 * time.Hour), csrf: csrf, subject: exp.subject}
+	token, csrf, ok := s.issueSessionLocked(t.subject, t.webRevision, "ticket", r)
+	if ok {
+		delete(s.tickets, secure.Hash(q.Ticket))
+	}
 	s.authMu.Unlock()
-	http.SetCookie(w, &http.Cookie{Name: "slb_session", Value: token, Path: "/", MaxAge: 8 * 3600, HttpOnly: true, Secure: true, SameSite: http.SameSiteStrictMode})
-	s.audit(model.Event{ActorID: exp.subject.ID, Action: "browser.login", Result: "success", RequestID: w.Header().Get("X-Request-ID")})
-	jsonReply(w, 200, map[string]any{"ok": true, "csrf": csrf})
+	if !ok {
+		s.deny(w, r, 429, "session_quota", "too many active browser sessions")
+		return
+	}
+	s.replySession(w, r, t.subject, token, csrf)
 }
 func (s *Server) activityFor(w http.ResponseWriter, r *http.Request, sub store.Subject) {
 	limit := 100

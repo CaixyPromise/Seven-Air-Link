@@ -37,6 +37,9 @@ func (a *application) storage(ctx context.Context, args []string) error {
 		}
 		return a.print(r)
 	case "restore":
+		if *out != "" {
+			return errors.New("restore uses --data NEW_DIRECTORY, not --out; no files were restored")
+		}
 		if *from == "" {
 			return errors.New("--from required")
 		}

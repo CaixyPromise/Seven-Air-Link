@@ -32,6 +32,8 @@ type pairingRecord struct {
 	ExpiresAt time.Time `json:"expiresAt"`
 }
 type snapshot struct {
+	WebAuth      webAuthRecord              `json:"-"`
+	Note         model.SharedNote           `json:"-"`
 	Principals   map[string]principalRecord `json:"principals"`
 	Messages     []model.Message            `json:"messages"`
 	MessageSeq   int64                      `json:"messageSeq"`
@@ -69,7 +71,7 @@ func New(path, ownerID, token string) (*Store, error) {
 	} else if !os.IsNotExist(e) {
 		return nil, e
 	}
-	s := snapshot{Version: 4, Principals: map[string]principalRecord{}, Messages: []model.Message{}, Files: map[string]model.File{}, Services: map[string]model.Service{}, OwnerID: ownerID, OwnerHash: secure.Hash(token), Devices: map[string]deviceRecord{}, Pairings: map[string]pairingRecord{}, Events: []model.Event{}}
+	s := snapshot{Version: SchemaVersion, Note: model.SharedNote{ID: "shared"}, Principals: map[string]principalRecord{}, Messages: []model.Message{}, Files: map[string]model.File{}, Services: map[string]model.Service{}, OwnerID: ownerID, OwnerHash: secure.Hash(token), Devices: map[string]deviceRecord{}, Pairings: map[string]pairingRecord{}, Events: []model.Event{}}
 	return createDB(path, s)
 }
 func Open(path string) (*Store, error) { return openDB(path) }
@@ -303,7 +305,7 @@ func (st *Store) Ready() error {
 	if e != nil {
 		return e
 	}
-	if len(rows) != 1 || rows[0][0] != int64(4) {
+	if len(rows) != 1 || rows[0][0] != int64(SchemaVersion) {
 		return errors.New("database not ready")
 	}
 	return nil

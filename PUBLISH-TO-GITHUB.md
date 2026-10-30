@@ -1,4 +1,4 @@
-# Seven-Air-Link · Publish 0.1.0-rc.1
+# Seven-Air-Link · Publish 0.1.0-rc.3
 
 This repository is prepared for the **CaixyPromise/Seven-Air-Link** GitHub repository. The repo must exist before its first push. The project name, CLI, Web brand and artifacts are **Seven-Air-Link / seven-air-link**; default HTTPS/API port **7777**, optional isolated proxy **7778**.
 
@@ -13,7 +13,7 @@ git remote remove origin
 # Creates a private repository and pushes the current main branch.
 gh repo create CaixyPromise/Seven-Air-Link --private --source=. --remote=origin --push
 # This tag does not include a milestone suffix or leading v.
-git push origin 0.1.0-rc.1
+git push origin 0.1.0-rc.3
 ```
 
 `gh auth login` may be required once on your own machine. GitHub Actions will build five native platform archives and create a GitHub **prerelease** when all builds pass.
@@ -21,24 +21,24 @@ git push origin 0.1.0-rc.1
 ## Alternative: GitHub website (no gh CLI)
 
 1. Create a **private, empty** repository named `Seven-Air-Link` in account `CaixyPromise` at <https://github.com/new>. **Do not** generate a README, LICENSE or .gitignore on GitHub; they already exist locally or may be added later.
-2. Clone the supplied Git bundle: `git clone Seven-Air-Link-0.1.0-rc.1.bundle Seven-Air-Link`.
+2. Clone the supplied Git bundle: `git clone Seven-Air-Link-0.1.0-rc.3.bundle Seven-Air-Link`.
 3. From the cloned directory, run:
 
 ```bash
 git remote set-url origin https://github.com/CaixyPromise/Seven-Air-Link.git
 git push -u origin main
-git push origin 0.1.0-rc.1
+git push origin 0.1.0-rc.3
 ```
 
-4. Visit **Actions** for the five build jobs. After all succeed, download Mac (`darwin-arm64` or `darwin-amd64`) and Windows (`windows-amd64`) from **Releases → 0.1.0-rc.1**. Do not treat an incomplete/failed run as a published binary.
+4. Visit **Actions** for the five build jobs. After all succeed, download Mac (`darwin-arm64` or `darwin-amd64`) and Windows (`windows-amd64`) from **Releases → 0.1.0-rc.3**. Do not treat an incomplete/failed run as a published binary.
 
 ## Expected release files
 
-- `Seven-Air-Link-0.1.0-rc.1-darwin-arm64.zip`
-- `Seven-Air-Link-0.1.0-rc.1-darwin-amd64.zip`
-- `Seven-Air-Link-0.1.0-rc.1-windows-amd64.zip` (includes SQLite DLL(s))
-- `Seven-Air-Link-0.1.0-rc.1-linux-amd64.zip`
-- `Seven-Air-Link-0.1.0-rc.1-linux-arm64.zip`
+- `Seven-Air-Link-0.1.0-rc.3-darwin-arm64.zip`
+- `Seven-Air-Link-0.1.0-rc.3-darwin-amd64.zip`
+- `Seven-Air-Link-0.1.0-rc.3-windows-amd64.zip` (includes SQLite DLL(s))
+- `Seven-Air-Link-0.1.0-rc.3-linux-amd64.zip`
+- `Seven-Air-Link-0.1.0-rc.3-linux-arm64.zip`
 - matching `.zip.sha256` archive checksums
 
 ## Server on Mac, Node on Windows

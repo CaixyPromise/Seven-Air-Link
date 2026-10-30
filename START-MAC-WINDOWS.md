@@ -1,4 +1,4 @@
-# Seven-Air-Link v0.1.0-rc.1 — Mac 启动 / Windows 连接
+# Seven-Air-Link v0.1.0-rc.3 — Mac 启动 / Windows 连接
 
 > **重要：** M4 是原生 SQLite/cgo 版本。当前交付的 Mac/Windows 文件属于**本机编译包**，并非已经通过 Linux 交叉编译的 M4 可执行文件。请分别在原生 macOS/Windows 上运行构建脚本，或使用随包提供的 GitHub Actions 工作流让原生 Runner 构建。不要把另附的 v0.3.0-m3 程序与 M4 共享同一数据目录。
 
@@ -166,3 +166,7 @@ Windows 的 Bot 应由 Owner 创建一次性邀请，在 Windows 用 `identity b
 - M4 Server 首次运行会新建 SQLite `bridge.db`；`server.key`、`admin.json` 和设备配置都是敏感文件。
 - 如临时使用另附的 M3 直运行包，建议独立目录，如 `.slb-m3-server`，不要与 M4 共用数据目录。
 - 当前打包脚本只在 Linux 容器做过静态检查；Mac/Windows 的 SQLite 真实构建与运行仍须在对应平台执行。没有数字签名/苹果公证。
+
+## rc.3 password and notepad
+
+Keep Server running and use `seven-air-link auth password set --config ./server-data/admin.json` once. Then Windows can use fixed-password Web login. Open **共享便签** for autosave/SSE. Details: [RC3.md](docs/RC3.md).
