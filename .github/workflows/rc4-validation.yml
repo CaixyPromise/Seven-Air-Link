@@ -1,0 +1,21 @@
+name: RC4 host and client security validation
+on:
+  push:
+    branches: [fix/rc4-host-client-boundaries]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  snapshot:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Archive exact tracked sources for reproducible local review
+        run: git archive --format=tar.gz --prefix=seven-air-link/ HEAD > source.tar.gz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rc4-reviewed-source
+          path: source.tar.gz
+          retention-days: 7
