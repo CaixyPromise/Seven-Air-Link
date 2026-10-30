@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net"
+	"runtime"
 	"seven-air-link/internal/controlws"
 	"seven-air-link/internal/model"
 	"seven-air-link/internal/secure"
@@ -12,6 +13,19 @@ import (
 	"syscall"
 	"time"
 )
+
+// Winsock reports WSAECONNREFUSED (10061), not Go's synthetic Windows
+// syscall.ECONNREFUSED. Compare wrapped error codes, never localized text.
+func targetDialError(err error) string {
+	if errors.Is(err, syscall.ECONNREFUSED) || (runtime.GOOS == "windows" && errors.Is(err, syscall.Errno(10061))) {
+		return "target_refused"
+	}
+	var ne net.Error
+	if errors.As(err, &ne) && ne.Timeout() {
+		return "timeout"
+	}
+	return "target_unreachable"
+}
 
 func (rt *localRuntime) handleTunnel(ctx context.Context, c *controlws.Conn, session string, m model.Control, wg *sync.WaitGroup) {
 	reject := func(code string) {
@@ -54,18 +68,10 @@ func (rt *localRuntime) handleTunnel(ctx context.Context, c *controlws.Conn, ses
 		defer stop()
 		raw, e := (&net.Dialer{}).DialContext(dialCtx, "tcp", m.Target)
 		if e != nil {
-			code := "target_unreachable"
-			var ne net.Error
-			if errors.Is(e, syscall.ECONNREFUSED) {
-				code = "target_refused"
-			} else if errors.As(e, &ne) && ne.Timeout() {
-				code = "timeout"
-			}
-			reject(code)
+			reject(targetDialError(e))
 			return
 		}
 		defer raw.Close()
-		// Stop/revoke may have arrived during the local connection attempt.
 		if !rt.approved(m.ServiceID, m.Target) {
 			reject("local_policy_denied")
 			return
