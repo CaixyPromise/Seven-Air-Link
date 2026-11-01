@@ -1,0 +1,26 @@
+name: Identity boundaries verification
+on:
+  push:
+    branches: [fix/client-identity-boundaries]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Archive exact tracked source
+        run: |
+          mkdir -p snapshot
+          git archive --format=tar.gz --prefix=seven-air-link/ HEAD > snapshot/seven-air-link-source.tar.gz
+          git rev-parse HEAD > snapshot/COMMIT
+          sha256sum snapshot/seven-air-link-source.tar.gz > snapshot/SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: identity-source
+          path: snapshot/
+          retention-days: 7
