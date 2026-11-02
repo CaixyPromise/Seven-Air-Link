@@ -14,7 +14,7 @@ jobs:
         with:
           ref: d33b84886b3ff52fa1dd3132943aa2a0345a6db7
           persist-credentials: false
-      - name: Verify patch and create source commit without moving any branch
+      - name: Verify source and import application tree only
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -22,28 +22,28 @@ jobs:
         run: |
           set -euo pipefail
           python3 - <<'PY'
-          import base64, hashlib, json, lzma, os, pathlib, subprocess, urllib.request
+          import base64, hashlib, json, lzma, os, pathlib, subprocess, urllib.request, urllib.error
           repo = os.environ['GH_REPO']
           assert repo == 'CaixyPromise/Seven-Air-Link'
           base = 'd33b84886b3ff52fa1dd3132943aa2a0345a6db7'
           base_tree = '464d45df05cf3b00c73c7fcd7d5934ac5e87bd27'
           expected_tree = 'f7e23c02a0e53731dcfe47063b811816d291a4f6'
+          expected_application_tree = 'aa1312db53590e3fb75fa71e92c58557718ce9f9'
           def api(method, endpoint, data=None):
               payload = None if data is None else json.dumps(data).encode('utf-8')
               request = urllib.request.Request('https://api.github.com/repos/'+repo+endpoint, data=payload, method=method, headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'], 'Accept':'application/vnd.github+json', 'Content-Type':'application/json', 'X-GitHub-Api-Version':'2022-11-28'})
-              with urllib.request.urlopen(request, timeout=60) as response:
-                  return json.load(response)
+              try:
+                  with urllib.request.urlopen(request, timeout=60) as response:
+                      return json.load(response)
+              except urllib.error.HTTPError as error:
+                  print('API_ERROR',method,endpoint,error.code,error.read().decode('utf-8'),flush=True)
+                  raise
           def git(*args):
               return subprocess.check_output(['git', *args])
           assert git('rev-parse','HEAD').decode().strip() == base
           assert git('rev-parse','HEAD^{tree}').decode().strip() == base_tree
           shas = ['ebdec08960c08632e41a5c2791a42f236b61e70f', '1cefaf04ef9a54a83419ea77e9fb2227f74e93f3', '9e321c87881ae042792139c0792886dde60d68d8', '2057fe6e5f05b09fe495d75143a818206b1fae18', '4ced009ce2f9ce3d03494279f96c66745808dbb4', '91a553de0cd4323c87ab21bd97e911f5307eb860']
-          chunks = []
-          for sha in shas:
-              blob = api('GET', '/git/blobs/'+sha)
-              assert blob['sha'] == sha and blob['encoding'] == 'base64'
-              chunks.append(base64.b64decode(blob['content']))
-          compressed = b''.join(chunks)
+          compressed = b''.join(base64.b64decode(api('GET','/git/blobs/'+sha)['content']) for sha in shas)
           assert hashlib.sha256(compressed).hexdigest() == '880dcf8a091355b3963871e8b75ef4652972a00ecfa883bceb2cd18b91735ff4'
           patch = lzma.decompress(compressed)
           assert hashlib.sha256(patch).hexdigest() == '3a6582255f66dc2ed3d4beb610d044f1a9fd3f3ed785ee012d031d84c6a7b0b2'
@@ -53,27 +53,23 @@ jobs:
           assert git('write-tree').decode().strip() == expected_tree
           index = {}
           for row in git('ls-files','--stage','-z').split(b'\0'):
-              if not row:
-                  continue
-              meta, path = row.split(b'\t',1)
-              mode, sha, stage = meta.decode().split()
-              assert stage == '0'
-              index[path.decode()] = mode
+              if row:
+                  meta, path = row.split(b'\t',1)
+                  mode, sha, stage = meta.decode().split()
+                  assert stage == '0'
+                  index[path.decode()] = mode
           names = [p.decode() for p in git('diff','--cached','--name-only','-z').split(b'\0') if p]
           assert len(names) == 57
           entries = []
           for name in names:
               assert not name.startswith('/') and '..' not in pathlib.PurePosixPath(name).parts
-              if name not in index:
-                  entries.append({'path':name,'mode':'100644','type':'blob','sha':None})
-              else:
-                  entries.append({'path':name,'mode':index[name],'type':'blob','content':pathlib.Path(name).read_bytes().decode('utf-8')})
+              if name.startswith('.github/workflows/'):
+                  continue
+              entries.append({'path':name,'mode':index[name],'type':'blob','content':pathlib.Path(name).read_bytes().decode('utf-8')})
+          assert len(entries) == 56
           tree = api('POST','/git/trees',{'base_tree':base_tree,'tree':entries})
-          assert tree['sha'] == expected_tree, tree['sha']
-          commit = api('POST','/git/commits',{'message':'fix: isolate Server Owner and independent client identities (rc.4)','tree':expected_tree,'parents':[base]})
-          result = {'commit':commit['sha'],'tree':expected_tree,'parent':base,'changedFiles':len(names),'patchSHA256':hashlib.sha256(patch).hexdigest(),'branchUpdated':False}
-          print('VERIFIED_SOURCE_COMMIT '+json.dumps(result),flush=True)
-          with open(os.environ['GITHUB_STEP_SUMMARY'],'a') as summary:
-              summary.write('## Verified source import\n\n```json\n'+json.dumps(result,indent=2)+'\n```\nNo branch or tag was changed.\n')
-          pathlib.Path(os.environ['RUNNER_TEMP'],'source-commit.json').write_text(json.dumps(result,indent=2))
+          assert tree['sha'] == expected_application_tree, tree['sha']
+          print('VERIFIED_APPLICATION_TREE '+tree['sha'],flush=True)
+          print('EXPECTED_FINAL_TREE '+expected_tree,flush=True)
+          print('No commits, refs, workflows or tags changed by this job.',flush=True)
           PY
