@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Seven-Air-Link M3",
-    "version": "0.1.0-rc.3",
+    "version": "0.1.0-rc.4",
     "description": "Implemented M1/M2 networking plus M3 Human/Bot collaboration. Browser, CLI and Bot use this same API. No Agent runtime, model execution or A2A. TLS is mandatory; Cookie mutations require same-origin and X-SLB-CSRF. Principal credentials never inherit bound Device permissions. JSON schema-3 storage, not SQLite. Independent HTTP Gateway origin and data-WS protocol remain documented in docs/PROTOCOL-M2.md. Detailed collaboration semantics: docs/CLI-M3.md."
   },
   "servers": [
@@ -88,7 +88,7 @@
     "/api/v1/me": {
       "get": {
         "summary": "Authenticated subject and browser CSRF token",
-        "description": "Authenticated subject (Owner/Device/Member), optional Principal description and browser CSRF token. Does not return long-lived credentials. A Device is not a messenger.",
+        "description": "Authenticated role, Principal, server-observed Source, and capability flags for UI. Owner requires valid Server-issued Owner credential AND real loopback connection. No identity/permission derivation from IP or forwarded headers. Return serverOwnerId for explicit grants, and connectionRole server-owner or participant.",
         "responses": {
           "200": {
             "description": "Success"
@@ -1010,7 +1010,7 @@
     "/api/v1/principals": {
       "post": {
         "summary": "Owner creates a pending Human or Bot identity",
-        "description": "Owner authorization is the human approval. Issues a 5-minute one-use invitation; no model is started. At most 256 stored member identities, including revoked records.",
+        "description": "Server-local Owner may create members; Human Members may create only Bots they own. Device association must be owned by that Human. Bot creation never grants global management or inherited service ACL.",
         "responses": {
           "201": {
             "description": "Success",
@@ -1743,7 +1743,7 @@
     },
     "/api/v1/sessions/password": {
       "post": {
-        "summary": "Owner password login; Secure HttpOnly SameSite session, maximum 8h; rate limited",
+        "summary": "Join or resume an independent Member browser identity using LAN admission password; NEVER Owner",
         "responses": {
           "200": {
             "description": "Success"
@@ -1769,7 +1769,8 @@
             }
           }
         },
-        "security": []
+        "security": [],
+        "description": "Issues HttpOnly Secure SameSite cookies: a 30-day independent browser credential and a maximum 8-hour runtime session. New browser (including same IP/name/password) => new Principal. Existing browser credential resumes its identity after password verification. Revoked remembered credentials fail closed."
       }
     },
     "/api/v1/auth/password": {
@@ -1789,7 +1790,8 @@
               }
             }
           }
-        }
+        },
+        "description": "Server-local Owner only. Manage the joining password, not an administrator password. Rotation/disable affects new admission; existing clients, Bots and Nodes remain independently revocable."
       },
       "put": {
         "summary": "Owner set/reset; current password required for browser changes; revoke Owner Web sessions",
@@ -1817,7 +1819,8 @@
               }
             }
           }
-        }
+        },
+        "description": "Server-local Owner only. Manage the joining password, not an administrator password. Rotation/disable affects new admission; existing clients, Bots and Nodes remain independently revocable."
       },
       "delete": {
         "summary": "Owner disable password; retain ticket recovery, not anonymous access",
@@ -1845,7 +1848,8 @@
               }
             }
           }
-        }
+        },
+        "description": "Server-local Owner only. Manage the joining password, not an administrator password. Rotation/disable affects new admission; existing clients, Bots and Nodes remain independently revocable."
       }
     },
     "/api/v1/sessions/{id}": {
@@ -1983,6 +1987,158 @@
             }
           }
         }
+      }
+    },
+    "/api/v1/clients/login": {
+      "post": {
+        "summary": "Enroll a new independent CLI Member; verify Server TLS before transmitting password; browser Origin denied",
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Structured non-2xx error; 401/403 deny unauthorized requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordLogin"
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/v1/clients/claim": {
+      "post": {
+        "summary": "Redeem one-use two-minute binding code for NEW CLI credential of same Member; browser Origin denied",
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Structured non-2xx error; 401/403 deny unauthorized requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClientBinding"
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/v1/client-links": {
+      "post": {
+        "summary": "Human Member requests explicit CLI binding code; bound to issuing credential; CSRF required for cookies",
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Structured non-2xx error; 401/403 deny unauthorized requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/client/device-pairings": {
+      "post": {
+        "summary": "Human Member invites own optional Node, never another Server; up to eight active Nodes per member",
+        "responses": {
+          "201": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Structured non-2xx error; 401/403 deny unauthorized requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/clients": {
+      "get": {
+        "summary": "Server-local Owner lists all clients; Human Member lists only its own credentials",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Structured non-2xx error; 401/403 deny unauthorized requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/clients/{id}": {
+      "delete": {
+        "summary": "Revoke ONE client credential and its tickets, sessions, pending CLI bindings, leases and streams; sibling credentials/Bots/Nodes survive",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "default": {
+            "description": "Structured non-2xx error; 401/403 deny unauthorized requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
       }
     }
   },
@@ -2222,6 +2378,9 @@
           },
           "correlationId": {
             "type": "string"
+          },
+          "source": {
+            "$ref": "#/components/schemas/Source"
           }
         },
         "required": [
@@ -2451,6 +2610,12 @@
           "expiresAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "clientId": {
+            "type": "string"
+          },
+          "sourceIp": {
+            "type": "string"
           }
         },
         "required": [
@@ -2875,6 +3040,9 @@
               "null"
             ],
             "format": "date-time"
+          },
+          "source": {
+            "$ref": "#/components/schemas/Source"
           }
         }
       },
@@ -2910,6 +3078,11 @@
             "type": "string",
             "writeOnly": true,
             "maxLength": 1024
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 80,
+            "description": "Display label, not identity or role. Same labels always allowed."
           }
         }
       },
@@ -2926,6 +3099,98 @@
           "currentPassword": {
             "type": "string",
             "writeOnly": true
+          }
+        }
+      },
+      "Source": {
+        "type": "object",
+        "properties": {
+          "clientId": {
+            "type": "string"
+          },
+          "sessionId": {
+            "type": "string"
+          },
+          "deviceId": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "ip": {
+            "type": "string"
+          }
+        },
+        "description": "Server-observed provenance. IP and client name are diagnostics, NEVER authority."
+      },
+      "Client": {
+        "type": "object",
+        "required": [
+          "id",
+          "principalId",
+          "kind",
+          "name",
+          "createdAt",
+          "expiresAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "principalId": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string"
+          },
+          "revokedAt": {
+            "type": "string"
+          },
+          "createdIp": {
+            "type": "string"
+          }
+        }
+      },
+      "ClientClaim": {
+        "type": "object",
+        "properties": {
+          "principal": {
+            "$ref": "#/components/schemas/Principal"
+          },
+          "client": {
+            "$ref": "#/components/schemas/Client"
+          },
+          "token": {
+            "type": "string",
+            "writeOnly": false,
+            "description": "Returned only once to TLS-authenticated CLI enrollment; store privately, never log."
+          }
+        }
+      },
+      "ClientBinding": {
+        "type": "object",
+        "required": [
+          "code",
+          "name"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 80
           }
         }
       }

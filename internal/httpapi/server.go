@@ -56,6 +56,7 @@ type rateWindow struct {
 	n     int
 }
 type Server struct {
+	clientLinks        map[string]clientLink
 	passwordSlots      chan struct{}
 	noteCount          map[string]int
 	bootID             string
@@ -223,6 +224,9 @@ func (s *Server) auth(r *http.Request) (store.Subject, string, error) {
 			return store.Subject{}, "", store.ErrAuth
 		}
 		sub, e := s.st.Auth(strings.TrimPrefix(a, "Bearer "))
+		if e == nil {
+			sub, e = s.requestSubject(r, sub, "")
+		}
 		return sub, "", e
 	}
 	c, e := r.Cookie("slb_session")
@@ -243,7 +247,8 @@ func (s *Server) auth(r *http.Request) (store.Subject, string, error) {
 	if !s.st.Active(sub) || bs.webRevision != s.ownerWebRevision(sub) {
 		return store.Subject{}, "", store.ErrPrincipalInactive
 	}
-	return sub, bs.csrf, nil
+	sub, e = s.requestSubject(r, sub, bs.id)
+	return sub, bs.csrf, e
 }
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	reqID := secure.Random("req_")[:28]
@@ -281,7 +286,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
 		switch path {
 		case "/api/v1/auth/methods":
-			jsonReply(w, 200, map[string]any{"password": s.st.WebPasswordStatus().Enabled, "ticket": true, "passwordIdentity": "owner"})
+			jsonReply(w, 200, map[string]any{"password": s.st.WebPasswordStatus().Enabled, "ticket": true, "passwordIdentity": "member", "localManagement": localRequest(r)})
 			return
 		case "/healthz":
 			jsonReply(w, 200, map[string]any{"ok": true})
@@ -296,7 +301,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		case "/api/v1/info":
 			jsonReply(w, 200, map[string]any{"name": "Seven-Air-Link", "version": model.Version, "releaseChannel": "rc", "proxyPort": s.proxyPort, "bootId": s.bootID, "protocol": model.Protocol, "fingerprint": s.pin})
 			return
-		case "/", "/index.html", "/app.js", "/collaboration.js", "/maintenance.js", "/notes.js", "/auth.js", "/style.css":
+		case "/", "/index.html", "/app.js", "/collaboration.js", "/maintenance.js", "/notes.js", "/auth.js", "/clients.js", "/style.css":
 			name := strings.TrimPrefix(path, "/")
 			if name == "" {
 				name = "index.html"
@@ -334,6 +339,14 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.join(w, r)
 		return
 	}
+	if path == "/api/v1/clients/login" && r.Method == "POST" {
+		s.loginClient(w, r, true)
+		return
+	}
+	if path == "/api/v1/clients/claim" && r.Method == "POST" {
+		s.claimClient(w, r)
+		return
+	}
 	if path == "/api/v1/sessions/password" && r.Method == "POST" {
 		s.loginPassword(w, r)
 		return
@@ -346,6 +359,10 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if e != nil {
 		code := "unauthenticated"
 		status := 401
+		if errors.Is(e, errLocalOwner) {
+			code = "owner_local_only"
+			status = 403
+		}
 		if errors.Is(e, store.ErrPrincipalInactive) {
 			code = "principal_inactive"
 			status = 403
@@ -367,7 +384,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if path == "/api/v1/me" && r.Method == "GET" {
 		p, _ := s.st.Principal(sub.ID)
-		jsonReply(w, 200, map[string]any{"id": sub.ID, "role": sub.Role, "csrf": csrf, "principal": p})
+		jsonReply(w, 200, map[string]any{"id": sub.ID, "role": sub.Role, "csrf": csrf, "principal": p, "source": sub.Source, "capabilities": s.capabilities(sub), "connectionRole": map[bool]string{true: "server-owner", false: "participant"}[sub.Role == "owner"], "serverOwnerId": s.st.OwnerID()})
 		return
 	}
 	if path == "/api/v1/status" && r.Method == "GET" {
@@ -404,6 +421,19 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		s.control(w, r, sub)
+		return
+	}
+	if r.Method != "GET" {
+		source := sub.Source
+		// Record source at the API admission boundary. Result is not task success;
+		// the operation's own event/result is correlated by this request ID.
+		resource := path
+		if len(resource) > 180 {
+			resource = resource[:180]
+		}
+		s.audit(model.Event{ActorID: sub.ID, Source: &source, Action: "api.request", ResourceID: resource, Result: "authenticated", RequestID: reqID})
+	}
+	if s.clientsRoute(w, r, sub) {
 		return
 	}
 	if s.authSettingsRoute(w, r, sub) {
@@ -541,7 +571,7 @@ func (s *Server) devices(sub store.Subject) []model.Device {
 	ds := s.st.Devices()
 	out := []model.Device{}
 	for _, d := range ds {
-		if sub.Role == "member" {
+		if sub.Role == "member" && d.OwnerID != sub.ID {
 			continue
 		}
 		if sub.Role == "device" && d.ID != sub.ID {
@@ -709,7 +739,7 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	}
 	s.authMu.Lock()
 	t, ok := s.tickets[secure.Hash(q.Ticket)]
-	if !ok || time.Now().After(t.expires) || !s.st.Active(t.subject) || t.webRevision != s.ownerWebRevision(t.subject) {
+	if !ok || time.Now().After(t.expires) || !s.st.Active(t.subject) || t.webRevision != s.ownerWebRevision(t.subject) || (t.subject.Role == "owner" && !localRequest(r)) {
 		s.authMu.Unlock()
 		s.deny(w, r, 403, "ticket_invalid_or_expired", "create a new one-time ticket using login create")
 		return

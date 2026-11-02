@@ -155,16 +155,16 @@ func (rt *localRuntime) create(ctx context.Context, q LocalShareRequest) (model.
 	defer rt.ops.Unlock()
 	req := model.ServiceCreate{ID: secure.Random("svc_")[:28], Name: q.Name, Protocol: q.Protocol, Target: target, AllowDevices: q.AllowDevices, AllowPrincipals: append([]string{}, q.AllowPrincipals...)}
 	if q.AllowOwner {
-		var ds struct {
-			Devices []model.Device `json:"devices"`
+		var me struct {
+			OwnerID string `json:"serverOwnerId"`
 		}
-		if e = rt.api.Do(ctx, "GET", "/api/v1/devices", nil, &ds); e != nil {
+		if e = rt.api.Do(ctx, "GET", "/api/v1/me", nil, &me); e != nil {
 			return model.Service{}, e
 		}
-		if len(ds.Devices) != 1 {
-			return model.Service{}, errors.New("could not resolve the device's owner principal")
+		if me.OwnerID == "" {
+			return model.Service{}, errors.New("server did not identify its Owner")
 		}
-		req.AllowPrincipals = append(req.AllowPrincipals, ds.Devices[0].OwnerID)
+		req.AllowPrincipals = append(req.AllowPrincipals, me.OwnerID)
 	}
 	if e = store.ValidateService(req); e != nil {
 		return model.Service{}, e

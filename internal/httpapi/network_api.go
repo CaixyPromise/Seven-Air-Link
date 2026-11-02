@@ -204,7 +204,7 @@ func (s *Server) networkRoute(w http.ResponseWriter, r *http.Request, sub store.
 		var f model.Forward
 		if e == nil {
 			now := time.Now().UTC()
-			f = model.Forward{ID: secure.Random("fwd_")[:28], ServiceID: v.ID, ActorID: sub.ID, ActorRole: sub.Role, CredentialStamp: sub.CredentialStamp, Listen: addr, StartedAt: now, ExpiresAt: now.Add(s.opt.ForwardLease)}
+			f = model.Forward{ClientID: sub.Source.ClientID, SourceIP: sub.Source.IP, ID: secure.Random("fwd_")[:28], ServiceID: v.ID, ActorID: sub.ID, ActorRole: sub.Role, CredentialStamp: sub.CredentialStamp, Listen: addr, StartedAt: now, ExpiresAt: now.Add(s.opt.ForwardLease)}
 			s.forwards[f.ID] = f
 		}
 		s.mu.Unlock()

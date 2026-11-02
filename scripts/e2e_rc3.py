@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""Real HTTPS/SSE processes: passwords, note CAS, restart and backup/restore."""
+"""Historical rc.3 OWNER-password contract; NOT a current regression entry.
+Use e2e_identity.py on rc.4.
+Real HTTPS/SSE processes: passwords, note CAS, restart and backup/restore."""
 import argparse, concurrent.futures, http.cookiejar, json, ssl, urllib.request, urllib.error
 from e2e import Harness, ROOT, wait_for
 PASSWORD='Correct battery horse 便签 2026'

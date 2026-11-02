@@ -1,6 +1,7 @@
 package store
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"seven-air-link/internal/model"
@@ -10,7 +11,7 @@ import (
 	"unicode/utf8"
 )
 
-const SchemaVersion = 5
+const SchemaVersion = 6
 const MaxNoteBytes = 64 * 1024
 const webAuthDDL = `CREATE TABLE web_auth (id INTEGER PRIMARY KEY CHECK(id=1), password_hash TEXT NOT NULL, revision INTEGER NOT NULL CHECK(revision>=0), updated_at TEXT NOT NULL)`
 const noteDDL = `CREATE TABLE shared_notes (id TEXT PRIMARY KEY CHECK(id='shared'), text TEXT NOT NULL, revision INTEGER NOT NULL CHECK(revision>=0), updated_by TEXT NOT NULL, updated_at TEXT NOT NULL)`
@@ -40,7 +41,7 @@ func upgradeSchema4(db *sqlite.DB) error {
 	if len(rows) != 1 {
 		return errors.New("missing database schema")
 	}
-	if rows[0][0] == int64(SchemaVersion) {
+	if rows[0][0] == int64(5) || rows[0][0] == int64(SchemaVersion) {
 		return nil
 	}
 	if rows[0][0] != int64(4) {
@@ -106,6 +107,20 @@ func readNotesAuth(db *sqlite.DB, s *snapshot) error {
 		}
 		n.UpdatedAt = &t
 	}
+	if s.Version >= 6 {
+		source, e := db.Query("SELECT source FROM shared_notes WHERE id='shared'")
+		if e != nil {
+			return e
+		}
+		if len(source) != 1 {
+			return errors.New("missing note source")
+		}
+		if source[0][0].(string) != "" {
+			if e = json.Unmarshal([]byte(source[0][0].(string)), &n.Source); e != nil {
+				return e
+			}
+		}
+	}
 	s.WebAuth = a
 	s.Note = n
 	return nil
@@ -123,7 +138,8 @@ func syncNotesAuth(tx *sqlite.Tx, old, next snapshot) error {
 		}
 	}
 	if old.Version == 0 || old.Note.Revision != next.Note.Revision {
-		if _, e := tx.Exec("INSERT INTO shared_notes VALUES('shared',?,?,?,?) ON CONFLICT(id) DO UPDATE SET text=excluded.text,revision=excluded.revision,updated_by=excluded.updated_by,updated_at=excluded.updated_at", next.Note.Text, next.Note.Revision, next.Note.UpdatedBy, timeValue(next.Note.UpdatedAt)); e != nil {
+		source, _ := json.Marshal(next.Note.Source)
+		if _, e := tx.Exec("INSERT INTO shared_notes(id,text,revision,updated_by,updated_at,source) VALUES('shared',?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET text=excluded.text,revision=excluded.revision,updated_by=excluded.updated_by,updated_at=excluded.updated_at,source=excluded.source", next.Note.Text, next.Note.Revision, next.Note.UpdatedBy, timeValue(next.Note.UpdatedAt), string(source)); e != nil {
 			return e
 		}
 	}
@@ -205,9 +221,10 @@ func (st *Store) UpdateSharedNote(sub Subject, q model.NoteWrite, requestID stri
 			return errNoteUnchanged
 		}
 		t := time.Now().UTC()
-		out = model.SharedNote{ID: "shared", Text: q.Text, Revision: s.Note.Revision + 1, UpdatedBy: sub.ID, UpdatedAt: &t}
+		origin := sub.Source
+		out = model.SharedNote{Source: &origin, ID: "shared", Text: q.Text, Revision: s.Note.Revision + 1, UpdatedBy: sub.ID, UpdatedAt: &t}
 		s.Note = out
-		addEvent(s, model.Event{ActorID: sub.ID, Action: "note.updated", ResourceID: "shared", Result: "success", CorrelationID: q.CorrelationID, RequestID: requestID})
+		addEvent(s, model.Event{Source: &origin, ActorID: sub.ID, Action: "note.updated", ResourceID: "shared", Result: "success", CorrelationID: q.CorrelationID, RequestID: requestID})
 		return nil
 	})
 	if errors.Is(e, errNoteUnchanged) {

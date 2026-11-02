@@ -11,13 +11,10 @@ import (
 	"time"
 )
 
-// Password login is Owner-only, never a Node enrollment or Bot credential.
-func (s *Server) ownerWebRevision(sub store.Subject) int64 {
-	if sub.Role == "owner" {
-		return s.st.WebPasswordStatus().Revision
-	}
-	return 0
-}
+// The joining password never authenticates Owner; management uses local credentials.
+// Admission password rotation does not change individual clients or the
+// server-local Owner credential. Revocation is an explicit, scoped action.
+func (s *Server) ownerWebRevision(sub store.Subject) int64 { return 0 }
 
 // Bounded transient rate windows. The Owner CLI/ticket path remains recovery.
 func (s *Server) passwordRate(key string, limit int) bool {
@@ -50,49 +47,7 @@ func (s *Server) passwordSlot(w http.ResponseWriter, r *http.Request) bool {
 		return false
 	}
 }
-func (s *Server) loginPassword(w http.ResponseWriter, r *http.Request) {
-	if !s.passwordRate("password-ip:"+remoteIP(r), 5) || !s.passwordRate("password-global", 30) {
-		w.Header().Set("Retry-After", "60")
-		s.deny(w, r, 429, "rate_limited", "too many password attempts; use a login ticket or retry later")
-		return
-	}
-	var q struct {
-		Password string `json:"password"`
-	}
-	r.Body = http.MaxBytesReader(w, r.Body, 8192)
-	if !s.body(w, r, &q) {
-		return
-	}
-	if len(q.Password) > secure.MaxPasswordBytes {
-		s.deny(w, r, 400, "invalid_password", "password exceeds the size limit")
-		return
-	}
-	if !s.passwordSlot(w, r) {
-		return
-	}
-	defer func() { <-s.passwordSlots }()
-	valid, rev := s.st.VerifyWebPassword(q.Password)
-	q.Password = ""
-	if !valid {
-		s.audit(model.Event{ActorID: "anonymous", Action: "auth.password_denied", Result: "denied", Code: "invalid_credentials", RequestID: w.Header().Get("X-Request-ID")})
-		s.deny(w, r, 403, "invalid_credentials", "password unavailable or incorrect")
-		return
-	}
-	sub := store.Subject{ID: s.st.OwnerID(), Role: "owner"}
-	s.authMu.Lock()
-	if s.ownerWebRevision(sub) != rev {
-		s.authMu.Unlock()
-		s.deny(w, r, 403, "invalid_credentials", "password changed; sign in again")
-		return
-	}
-	token, csrf, ok := s.issueSessionLocked(sub, rev, "password", r)
-	s.authMu.Unlock()
-	if !ok {
-		s.deny(w, r, 429, "session_quota", "too many active browser sessions")
-		return
-	}
-	s.replySession(w, r, sub, token, csrf)
-}
+func (s *Server) loginPassword(w http.ResponseWriter, r *http.Request) { s.loginClient(w, r, false) }
 func (s *Server) issueSessionLocked(sub store.Subject, rev int64, method string, r *http.Request) (string, string, bool) {
 	now := time.Now()
 	for k, b := range s.sessions {
@@ -179,18 +134,6 @@ func (s *Server) authSettingsRoute(w http.ResponseWriter, r *http.Request, sub s
 	q.CurrentPassword = ""
 	s.authMu.Lock()
 	err := s.st.SetWebPassword(sub, encoded, old.Revision, w.Header().Get("X-Request-ID"))
-	if err == nil {
-		for k, b := range s.sessions {
-			if b.subject.ID == sub.ID {
-				delete(s.sessions, k)
-			}
-		}
-		for k, b := range s.tickets {
-			if b.subject.ID == sub.ID {
-				delete(s.tickets, k)
-			}
-		}
-	}
 	s.authMu.Unlock()
 	if errors.Is(err, store.ErrAuthRevision) {
 		s.deny(w, r, 409, "auth_revision_conflict", err.Error())
@@ -200,22 +143,7 @@ func (s *Server) authSettingsRoute(w http.ResponseWriter, r *http.Request, sub s
 		s.deny(w, r, 503, "storage_unavailable", "password change was not committed")
 		return true
 	}
-	s.mu.Lock()
-	for k, g := range s.proxySessions {
-		if g.Subject.ID == sub.ID {
-			delete(s.proxySessions, k)
-		}
-	}
-	for k, g := range s.proxyTickets {
-		if g.Subject.ID == sub.ID {
-			delete(s.proxyTickets, k)
-		}
-	}
-	s.mu.Unlock()
-	if _, e := r.Cookie("slb_session"); e == nil {
-		http.SetCookie(w, &http.Cookie{Name: "slb_session", Value: "", Path: "/", MaxAge: -1, HttpOnly: true, Secure: true, SameSite: http.SameSiteStrictMode})
-	}
-	jsonReply(w, 200, map[string]any{"password": s.st.WebPasswordStatus(), "ownerBrowserSessionsRevoked": true})
+	jsonReply(w, 200, map[string]any{"password": s.st.WebPasswordStatus(), "existingClientsUnchanged": true})
 	return true
 }
 

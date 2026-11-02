@@ -27,9 +27,13 @@ import (
 	"time"
 )
 
-const help = `Seven-Air-Link 0.1.0-rc.3 — Human / Bot collaboration and local service networking
+const help = `Seven-Air-Link 0.1.0-rc.4 — Human / Bot collaboration and local service networking
 
 Usage:
+  seven-air-link client login https://SERVER:7777 --fingerprint SHA256 --name NAME --config CLIENT_JSON
+  seven-air-link client bind https://SERVER:7777 --fingerprint SHA256 --name NAME --config CLI_JSON
+  seven-air-link client node --out NODE_JSON --config CLIENT_JSON
+  seven-air-link client list|revoke CLIENT_ID --config CLIENT_JSON
   seven-air-link init [--data DIR] [--port 7777] [--tls-host HOST,IP]
   seven-air-link serve [--data DIR] [--listen 0.0.0.0:7777] [--port PORT]
   seven-air-link pairing create --config ADMIN_JSON [--ttl 5m] [--out FILE]
@@ -223,6 +227,8 @@ func (a *application) run(ctx context.Context, args []string) error {
 		return e
 	}
 	switch args[0] {
+	case "client":
+		return a.clientCommand(ctx, args[1:])
 	case "auth":
 		return a.authCommand(ctx, args[1:])
 	case "note":

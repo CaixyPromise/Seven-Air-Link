@@ -65,7 +65,7 @@ func CanUse(s model.Service, sub Subject) bool {
 	return false
 }
 func CanManage(s model.Service, sub Subject) bool {
-	return sub.Role == "owner" && sub.ID == s.OwnerPrincipalID || sub.Role == "device" && sub.ID == s.OwnerDeviceID
+	return sub.Role == "owner" || sub.Role == "device" && sub.ID == s.OwnerDeviceID
 }
 func cloneService(s model.Service) model.Service {
 	s.AllowDevices = append([]string{}, s.AllowDevices...)
@@ -157,7 +157,7 @@ func (st *Store) CreateService(sub Subject, q model.ServiceCreate, req string) (
 			return e
 		}
 		now := time.Now().UTC()
-		result = model.Service{ID: q.ID, Name: q.Name, Protocol: q.Protocol, Target: q.Target, OwnerDeviceID: sub.ID, OwnerPrincipalID: s.OwnerID, AllowDevices: append([]string{}, q.AllowDevices...), AllowPrincipals: append([]string{}, q.AllowPrincipals...), CreatedAt: now, UpdatedAt: now, Revision: 1, Status: "offline"}
+		result = model.Service{ID: q.ID, Name: q.Name, Protocol: q.Protocol, Target: q.Target, OwnerDeviceID: sub.ID, OwnerPrincipalID: d.Device.OwnerID, AllowDevices: append([]string{}, q.AllowDevices...), AllowPrincipals: append([]string{}, q.AllowPrincipals...), CreatedAt: now, UpdatedAt: now, Revision: 1, Status: "offline"}
 		s.Services[q.ID] = result
 		addEvent(s, model.Event{ActorID: sub.ID, DeviceID: sub.ID, Action: "service.created", ResourceID: q.ID, Result: "success", RequestID: req})
 		return nil
@@ -170,7 +170,7 @@ func (st *Store) ChangeService(sub Subject, id string, g *model.Grants, req stri
 		if !ok {
 			return os.ErrNotExist
 		}
-		if !CanManage(v, sub) {
+		if !activeSubject(s, sub) || !CanManage(v, sub) {
 			return ErrDenied
 		}
 		if v.Disabled {

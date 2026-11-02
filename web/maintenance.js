@@ -6,13 +6,13 @@ window.storageReset = () => {
   $("#storage-refresh").disabled = false;
 };
 $("#storage-refresh").addEventListener("click", async () => {
-  if (state.me?.role !== "owner") return;
+  if (!state.me?.capabilities?.manageStorage) return;
   const epoch = state.authEpoch;
   const button = $("#storage-refresh");
   button.disabled = true;
   try {
     const report = await api("/api/v1/storage");
-    if (epoch !== state.authEpoch || state.me?.role !== "owner") return;
+    if (epoch !== state.authEpoch || !state.me?.capabilities?.manageStorage) return;
     $("#storage-summary").textContent = `SQLite ${report.sqliteVersion} · schema ${report.schema} · ${report.messages} 条消息 · ${report.files} 个有效附件`;
     const mib = n => (Number(n || 0) / 1048576).toFixed(2);
     $("#storage-size").textContent = `数据库 ${mib(report.databaseBytes)} MiB / WAL ${mib(report.walBytes)} MiB / 附件 ${mib(report.fileBytes)} MiB`;

@@ -19,6 +19,8 @@ import (
 func (s *Server) collaborationError(w http.ResponseWriter, r *http.Request, e error) {
 	code, status, message := "invalid_request", 400, e.Error()
 	switch {
+	case errors.Is(e, store.ErrAuthRevision):
+		code, status, message = "joining_password_changed", 403, "joining password changed or disabled; retry with the current value"
 	case errors.Is(e, store.ErrDenied):
 		code, status, message = "access_denied", 403, "this identity cannot access this collaboration resource"
 	case errors.Is(e, store.ErrPrincipalInactive):
@@ -140,7 +142,7 @@ func (s *Server) collaborationRoute(w http.ResponseWriter, r *http.Request, sub 
 		}
 	case strings.HasPrefix(path, "/api/v1/principals/"):
 		parts := strings.Split(strings.TrimPrefix(path, "/api/v1/principals/"), "/")
-		if sub.Role != "owner" {
+		if !s.st.CanManagePrincipal(sub, parts[0]) {
 			s.collaborationError(w, r, store.ErrDenied)
 			break
 		}

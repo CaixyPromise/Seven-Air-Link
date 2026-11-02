@@ -5,6 +5,7 @@ import "time"
 // SharedNote is one workspace-wide board, not a document/Agent task system.
 // Revision is the CAS token and SSE snapshot ID; text never appears in audit.
 type SharedNote struct {
+	Source    *Source    `json:"source,omitempty"`
 	ID        string     `json:"id"`
 	Text      string     `json:"text"`
 	Revision  int64      `json:"revision"`

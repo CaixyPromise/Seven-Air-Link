@@ -89,7 +89,7 @@ func (a *application) authCommand(ctx context.Context, args []string) error {
 			if !ok {
 				return errors.New("interactive password input requires a terminal; use --password-stdin")
 			}
-			pw, e = terminal.ReadPassword(ctx, in, a.err, "Set administrator web password: ")
+			pw, e = terminal.ReadPassword(ctx, in, a.err, "Set LAN joining password: ")
 			if e != nil {
 				return e
 			}
@@ -111,7 +111,7 @@ func (a *application) authCommand(ctx context.Context, args []string) error {
 		}
 		e = c.Do(ctx, "PUT", "/api/v1/auth/password", map[string]string{"password": string(pw)}, &out)
 		if e == nil {
-			fmt.Fprintln(a.err, "Web password configured. Existing Owner browser sessions were revoked; Node/Bot credentials are unchanged.")
+			fmt.Fprintln(a.err, "Joining password configured. Password login creates separate members, never Owner. Existing clients and Node/Bot credentials are unchanged.")
 		}
 	default:
 		return errors.New("usage: auth password set|status|disable")

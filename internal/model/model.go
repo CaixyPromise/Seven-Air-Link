@@ -4,7 +4,7 @@ package model
 import "time"
 
 const Protocol = 1
-const Version = "0.1.0-rc.3"
+const Version = "0.1.0-rc.4"
 
 type Device struct {
 	ID          string     `json:"id"`
@@ -21,6 +21,7 @@ type Device struct {
 	SessionID   string     `json:"sessionId,omitempty"`
 }
 type Event struct {
+	Source        *Source   `json:"source,omitempty"`
 	Seq           int64     `json:"seq"`
 	Time          time.Time `json:"time"`
 	ActorID       string    `json:"actorId"`

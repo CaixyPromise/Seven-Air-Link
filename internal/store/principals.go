@@ -16,6 +16,7 @@ var ErrIdempotency = errors.New("idempotency_conflict")
 var ErrQuota = errors.New("quota_exceeded")
 
 type principalRecord struct {
+	ManagedClients    bool            `json:"managedClients,omitempty"`
 	Principal         model.Principal `json:"principal"`
 	TokenHash         string          `json:"tokenHash"`
 	EnrollmentHash    string          `json:"enrollmentHash,omitempty"`
@@ -27,11 +28,17 @@ func activePrincipal(s *snapshot, id string) bool {
 		return true
 	}
 	rec, ok := s.Principals[id]
-	if !ok || rec.TokenHash == "" || rec.Principal.RevokedAt != nil {
+	if !ok || (!rec.ManagedClients && rec.TokenHash == "") || rec.Principal.RevokedAt != nil {
 		return false
 	}
 	if rec.Principal.ExpiresAt == nil || !time.Now().Before(*rec.Principal.ExpiresAt) {
 		return false
+	}
+	if parent := rec.Principal.OwnerID; parent != "" && parent != s.OwnerID {
+		p, exists := s.Principals[parent]
+		if !exists || p.Principal.Type != "human" || p.Principal.RevokedAt != nil || p.Principal.ExpiresAt == nil || !time.Now().Before(*p.Principal.ExpiresAt) {
+			return false
+		}
 	}
 	if d := rec.Principal.DeviceID; d != "" {
 		device, ok := s.Devices[d]
@@ -46,7 +53,18 @@ func activeSubject(s *snapshot, sub Subject) bool {
 	case "owner":
 		return sub.ID == s.OwnerID
 	case "member":
-		return sub.ID != s.OwnerID && activePrincipal(s, sub.ID) && sub.CredentialStamp != "" && secure.Equal(sub.CredentialStamp, s.Principals[sub.ID].TokenHash)
+		if sub.ID == s.OwnerID || !activePrincipal(s, sub.ID) || sub.CredentialStamp == "" {
+			return false
+		}
+		if secure.Equal(sub.CredentialStamp, s.Principals[sub.ID].TokenHash) {
+			return true
+		}
+		for _, c := range s.Clients {
+			if c.Client.PrincipalID == sub.ID && secure.Equal(c.TokenHash, sub.CredentialStamp) && clientActive(s, c) {
+				return true
+			}
+		}
+		return false
 	case "device":
 		d, ok := s.Devices[sub.ID]
 		return ok && d.Device.RevokedAt == nil
@@ -69,8 +87,10 @@ func principalView(s *snapshot, rec principalRecord) model.Principal {
 		p.Status = "expired"
 	case p.DeviceID != "" && (s.Devices[p.DeviceID].Device.ID == "" || s.Devices[p.DeviceID].Device.RevokedAt != nil):
 		p.Status = "device_revoked"
-	case rec.TokenHash == "":
+	case rec.TokenHash == "" && !rec.ManagedClients:
 		p.Status = "pending"
+	case !activePrincipal(s, p.ID):
+		p.Status = "inactive"
 	default:
 		p.Status = "active"
 	}
@@ -116,7 +136,7 @@ func (st *Store) CreatePrincipal(sub Subject, q model.PrincipalCreate, req strin
 	p := model.Principal{ID: secure.Random(q.Type + "_")[:28], Name: q.Name, Type: q.Type, Role: "member", DeviceID: q.DeviceID, CreatedAt: now, ExpiresAt: &expires, Status: "pending"}
 	out := model.Enrollment{Principal: p, Code: secure.Random("bind_"), ExpiresAt: now.Add(5 * time.Minute)}
 	err := st.mutate(func(s *snapshot) error {
-		if sub.Role != "owner" || sub.ID != s.OwnerID {
+		if !activeSubject(s, sub) || (sub.Role != "owner" && (sub.Role != "member" || s.Principals[sub.ID].Principal.Type != "human" || q.Type != "bot")) {
 			return ErrDenied
 		}
 		if len(s.Principals) >= 256 {
@@ -124,8 +144,8 @@ func (st *Store) CreatePrincipal(sub Subject, q model.PrincipalCreate, req strin
 		}
 		if q.DeviceID != "" {
 			d, ok := s.Devices[q.DeviceID]
-			if !ok || d.Device.RevokedAt != nil {
-				return errors.New("unknown or revoked bound device")
+			if !ok || d.Device.RevokedAt != nil || (sub.Role != "owner" && d.Device.OwnerID != sub.ID) {
+				return errors.New("unknown, unowned or revoked bound device")
 			}
 		}
 		for _, rec := range s.Principals {
@@ -133,7 +153,7 @@ func (st *Store) CreatePrincipal(sub Subject, q model.PrincipalCreate, req strin
 				return ErrConflict
 			}
 		}
-		out.Principal.OwnerID = s.OwnerID
+		out.Principal.OwnerID = sub.ID
 		s.Principals[p.ID] = principalRecord{Principal: out.Principal, EnrollmentHash: secure.Hash(out.Code), EnrollmentExpires: out.ExpiresAt}
 		addEvent(s, model.Event{ActorID: sub.ID, Action: "principal.created", ResourceID: p.ID, Result: "success", RequestID: req})
 		return nil
@@ -173,7 +193,7 @@ func (st *Store) Claim(code, req string) (model.Claim, error) {
 }
 func (st *Store) RevokePrincipal(sub Subject, id, req string) error {
 	return st.mutate(func(s *snapshot) error {
-		if sub.Role != "owner" || sub.ID != s.OwnerID {
+		if !canManagePrincipal(s, sub, id) {
 			return ErrDenied
 		}
 		rec, ok := s.Principals[id]
@@ -197,7 +217,7 @@ func (st *Store) RevokePrincipal(sub Subject, id, req string) error {
 func (st *Store) Reenroll(sub Subject, id, req string) (model.Enrollment, error) {
 	out := model.Enrollment{Code: secure.Random("bind_"), ExpiresAt: time.Now().UTC().Add(5 * time.Minute)}
 	err := st.mutate(func(s *snapshot) error {
-		if sub.Role != "owner" || sub.ID != s.OwnerID {
+		if !canManagePrincipal(s, sub, id) {
 			return ErrDenied
 		}
 		rec, ok := s.Principals[id]
@@ -215,6 +235,14 @@ func (st *Store) Reenroll(sub Subject, id, req string) (model.Enrollment, error)
 		expires := time.Now().UTC().Add(30 * 24 * time.Hour)
 		rec.Principal.ExpiresAt = &expires
 		rec.TokenHash = ""
+		for key, c := range s.Clients {
+			if c.Client.PrincipalID == id && c.Client.RevokedAt == nil {
+				now := time.Now().UTC()
+				c.Client.RevokedAt = &now
+				s.Clients[key] = c
+			}
+		}
+		rec.ManagedClients = false
 		rec.Principal.Status = "pending"
 		rec.EnrollmentHash = secure.Hash(out.Code)
 		rec.EnrollmentExpires = out.ExpiresAt

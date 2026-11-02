@@ -50,7 +50,7 @@ def main():
             parser.error(f'missing runtime SQLite DLL: {dll}')
         for dep in sorted((ROOT / 'dist').glob('*.dll')):
             content.append((dep.name, dep))
-    for name in ('README.md', 'START-MAC-WINDOWS.md', 'LICENSE', 'THIRD-PARTY-NOTICES.md', 'docs/RC3.md'):
+    for name in ('README.md', 'START-MAC-WINDOWS.md', 'LICENSE', 'THIRD-PARTY-NOTICES.md', 'docs/RC4.md', 'docs/IDENTITY-BOUNDARIES.md'):
         src = ROOT / name
         if src.exists():
             content.append((name, src))
