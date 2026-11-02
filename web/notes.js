@@ -8,7 +8,7 @@ function notesReset(){if(board){clearTimeout(board.timer);board.stream?.close();
 window.notesReset=notesReset;
 window.notesHasUnsaved=()=>!!(board&&(board.dirty||board.saving));
 function currentBoard(b){return board===b&&b.epoch===state.authEpoch&&!!state.me;}
-function renderNoteMeta(b){$("#note-meta").textContent=`版本 ${b.revision}${b.updatedBy?" · "+(state.peers.find(p=>p.id===b.updatedBy)?.name||b.updatedBy):""}${b.updatedAt?" · "+timeText(b.updatedAt):""}`;noteSize();}
+function renderNoteMeta(b){$("#note-meta").textContent=`版本 ${b.revision}${b.updatedBy?" · "+(state.peers.find(p=>p.id===b.updatedBy)?.name||b.updatedBy):""}${b.updatedAt?" · "+timeText(b.updatedAt):""}${b.source?" · "+b.source.kind+" · "+(b.source.ip||"本机"):""}`;noteSize();}
 function noteConflict(b,remote){b.remote=remote;clearTimeout(b.timer);$("#note-conflict").hidden=false;$("#note-remote").value=remote.text;$("#note-conflict-description").textContent=`服务器当前版本为 ${remote.revision}。请选择采用服务器内容，或明确确认将本机草稿保存为新版本。`;notesStatus("存在并发冲突 · 草稿尚未保存",true);}
 function acceptNote(b,n,snapshot=false){
  if(!currentBoard(b)||!n||typeof n.text!=="string"||!Number.isSafeInteger(n.revision))return;
@@ -17,7 +17,7 @@ function acceptNote(b,n,snapshot=false){
  const localDraft=b.dirty||(b.pending&&noteInput.value!==b.pending.text);
  if(b.loaded&&localDraft&&n.text!==noteInput.value&&!mine){noteConflict(b,n);return;}
  if(!b.loaded||(!localDraft&&!mine)){noteInput.value=n.text;}
- b.loaded=true;noteInput.disabled=false;b.revision=n.revision;b.baseText=n.text;b.updatedBy=n.updatedBy;b.updatedAt=n.updatedAt;b.dirty=noteInput.value!==n.text;b.remote=null;$("#note-conflict").hidden=true;$("#note-remote").value="";
+ b.loaded=true;noteInput.disabled=false;b.revision=n.revision;b.baseText=n.text;b.updatedBy=n.updatedBy;b.updatedAt=n.updatedAt;b.source=n.source;b.dirty=noteInput.value!==n.text;b.remote=null;$("#note-conflict").hidden=true;$("#note-remote").value="";
  notesStatus(b.dirty?"正在编辑 · 稍后自动保存":"已保存 · 实时同步");renderNoteMeta(b);if(b.dirty&&!b.saving)scheduleNote(b);
 }
 function scheduleNote(b){clearTimeout(b.timer);if(!currentBoard(b)||!b.loaded||!b.dirty||b.remote||b.saving||b.composing)return;if(noteSize()>65536){notesStatus("内容超过 64 KiB，尚未保存",true);return;}b.timer=setTimeout(()=>saveNote(b),800);}
@@ -47,5 +47,5 @@ $("#note-copy").addEventListener("click",()=>copy(noteInput.value));$("#note-cop
 $("#note-use-remote").addEventListener("click",()=>{const b=board;if(!b?.remote)return;if(!confirm("放弃当前未保存草稿，采用服务器版本？可先复制本机草稿。"))return;const n=b.remote;b.dirty=false;acceptNote(b,n,true);});
 $("#note-keep-local").addEventListener("click",()=>{const b=board;if(!b?.remote||b.saving)return;if(!confirm("确认将本机草稿保存到服务器？这会替换当前显示的服务器内容，并重新校验版本。"))return;const n=b.remote;b.revision=n.revision;b.baseText=n.text;b.remote=null;$("#note-conflict").hidden=true;b.dirty=noteInput.value!==b.baseText;if(b.dirty)saveNote(b);else acceptNote(b,n,true);});
 window.addEventListener("beforeunload",e=>{if(board&&(board.dirty||board.saving)){e.preventDefault();e.returnValue="";}});
-Object.assign(labels,{"note.updated":"更新共享便签","auth.password_changed":"修改网页登录密码","auth.password_disabled":"关闭密码登录","auth.password_denied":"密码登录失败","browser.sessions_revoked":"撤销网页会话"});
+Object.assign(labels,{"note.updated":"更新共享便签","auth.password_changed":"修改加入密码","auth.password_disabled":"关闭密码加入","auth.password_denied":"密码登录失败","browser.sessions_revoked":"撤销网页会话"});
 if(state.me&&!board)startNotes();

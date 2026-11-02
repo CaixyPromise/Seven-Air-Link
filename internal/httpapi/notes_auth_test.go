@@ -24,22 +24,22 @@ func ticketSession(t *testing.T, r *rig, token string) (string, string) {
 		CSRF string `json:"csrf"`
 	}
 	getJSON(t, response, &data)
-	return response.Cookies()[0].String(), data.CSRF
+	return sessionCookie(response).String(), data.CSRF
 }
 func loginTestPassword(t *testing.T, r *rig, pw string) (string, string) {
 	t.Helper()
 	response := r.raw(t, "POST", "/api/v1/sessions/password", "", map[string]string{"password": pw}, map[string]string{"Origin": r.http.URL})
 	expect(t, response, 200)
-	if c := response.Cookies()[0]; !c.Secure || !c.HttpOnly || c.SameSite != http.SameSiteStrictMode || c.MaxAge != 8*3600 {
+	if c := sessionCookie(response); !c.Secure || !c.HttpOnly || c.SameSite != http.SameSiteStrictMode || c.MaxAge != 8*3600 {
 		t.Fatal("unsafe cookie", c)
 	}
 	var data struct {
 		CSRF string `json:"csrf"`
 	}
 	getJSON(t, response, &data)
-	return response.Cookies()[0].String(), data.CSRF
+	return sessionCookie(response).String(), data.CSRF
 }
-func TestPasswordLoginChangeInvalidationAndIdentitySeparation(t *testing.T) {
+func TestJoiningPasswordNeverGrantsOwnerOrChangesExistingCredentials(t *testing.T) {
 	r := newRig(t)
 	bot, _ := r.participant(t, "Unaffected Bot", "bot", "")
 	dev := r.join(t, "Unaffected Node")
@@ -53,15 +53,14 @@ func TestPasswordLoginChangeInvalidationAndIdentitySeparation(t *testing.T) {
 	}
 	expect(t, r.raw(t, "PUT", "/api/v1/auth/password", r.token, map[string]string{"password": "short"}, nil), 400)
 	expect(t, r.raw(t, "PUT", "/api/v1/auth/password", r.token, map[string]string{"password": pw}, nil), 200)
-	expect(t, r.raw(t, "GET", "/api/v1/me", "", nil, map[string]string{"Cookie": ownerCookie}), 401)
-	expect(t, r.raw(t, "GET", "/api/v1/me", "", nil, map[string]string{"Cookie": botCookie}), 200)
-	expect(t, r.raw(t, "POST", "/api/v1/sessions/password", "", map[string]string{"password": "bad"}, nil), 403)
+	expect(t, r.raw(t, "GET", "/api/v1/me", "", nil, map[string]string{"Cookie": ownerCookie}), 200)
 	cookie, csrf := loginTestPassword(t, r, pw)
 	expect(t, r.raw(t, "PUT", "/api/v1/note", "", map[string]any{"text": "CSRF", "baseRevision": 0}, map[string]string{"Cookie": cookie}), 403)
-	expect(t, r.raw(t, "PUT", "/api/v1/auth/password", "", map[string]string{"password": next, "currentPassword": "bad"}, map[string]string{"Cookie": cookie, "X-SLB-CSRF": csrf}), 403)
-	expect(t, r.raw(t, "PUT", "/api/v1/auth/password", "", map[string]string{"password": next, "currentPassword": pw}, map[string]string{"Cookie": cookie, "X-SLB-CSRF": csrf}), 200)
-	expect(t, r.raw(t, "GET", "/api/v1/me", "", nil, map[string]string{"Cookie": cookie}), 401)
-	expect(t, r.raw(t, "GET", "/api/v1/me", "", nil, map[string]string{"Cookie": botCookie}), 200)
+	expect(t, r.raw(t, "PUT", "/api/v1/auth/password", "", map[string]string{"password": next, "currentPassword": pw}, map[string]string{"Cookie": cookie, "X-SLB-CSRF": csrf}), 403)
+	expect(t, r.raw(t, "PUT", "/api/v1/auth/password", r.token, map[string]string{"password": next}, nil), 200)
+	for _, c := range []string{cookie, ownerCookie, botCookie} {
+		expect(t, r.raw(t, "GET", "/api/v1/me", "", nil, map[string]string{"Cookie": c}), 200)
+	}
 	for _, token := range []string{r.token, bot.Token, dev.Token} {
 		expect(t, r.raw(t, "GET", "/api/v1/me", token, nil, nil), 200)
 	}
@@ -71,8 +70,16 @@ func TestPasswordLoginChangeInvalidationAndIdentitySeparation(t *testing.T) {
 	defer response.Body.Close()
 	raw, _ := io.ReadAll(response.Body)
 	if bytes.Contains(raw, []byte(pw)) || bytes.Contains(raw, []byte(next)) || bytes.Contains(raw, []byte("pbkdf2")) {
-		t.Fatal("password data in audit")
+		t.Fatal("secret in audit")
 	}
+}
+func sessionCookie(r *http.Response) *http.Cookie {
+	for _, c := range r.Cookies() {
+		if c.Name == "slb_session" {
+			return c
+		}
+	}
+	return &http.Cookie{}
 }
 func TestPasswordRateLimitsOriginDisableAndTicketRecovery(t *testing.T) {
 	r := newRig(t)

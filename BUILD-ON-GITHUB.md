@@ -25,3 +25,7 @@ Do not commit `server.key`, `admin.json`, `bridge.db`, `.slb-server`, Bot/device
 ## Release request after all native builds succeed
 
 The file .github/release-request.txt specifies the next RC version. Main branch CI builds all five platforms before creating its immutable tag and publishing the validated artifacts in one workflow. Existing tags are never overwritten.
+
+## Identity-boundary release gate
+
+The fix/client-identity-boundaries branch runs all five native builds and Linux live-browser acceptance but never publishes a tag. Only merge the reviewed, green branch to main to activate the rc.4 release request. Do not skip failing identity tests or move old tags. Local offline UI screenshots are not the live-browser gate.

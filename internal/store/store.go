@@ -29,9 +29,12 @@ type deviceRecord struct {
 	TokenHash string       `json:"tokenHash"`
 }
 type pairingRecord struct {
-	ExpiresAt time.Time `json:"expiresAt"`
+	IssuerStamp string    `json:"issuerStamp,omitempty"`
+	OwnerID     string    `json:"ownerId,omitempty"`
+	ExpiresAt   time.Time `json:"expiresAt"`
 }
 type snapshot struct {
+	Clients      map[string]clientRecord    `json:"-"`
 	WebAuth      webAuthRecord              `json:"-"`
 	Note         model.SharedNote           `json:"-"`
 	Principals   map[string]principalRecord `json:"principals"`
@@ -59,6 +62,7 @@ type Store struct {
 // CredentialStamp is an internal credential-generation binding. It never leaves
 // the process in JSON and prevents capabilities from surviving token rotation.
 type Subject struct {
+	Source          model.Source
 	ID              string
 	Role            string
 	CredentialStamp string `json:"-"`
@@ -71,7 +75,7 @@ func New(path, ownerID, token string) (*Store, error) {
 	} else if !os.IsNotExist(e) {
 		return nil, e
 	}
-	s := snapshot{Version: SchemaVersion, Note: model.SharedNote{ID: "shared"}, Principals: map[string]principalRecord{}, Messages: []model.Message{}, Files: map[string]model.File{}, Services: map[string]model.Service{}, OwnerID: ownerID, OwnerHash: secure.Hash(token), Devices: map[string]deviceRecord{}, Pairings: map[string]pairingRecord{}, Events: []model.Event{}}
+	s := snapshot{Clients: map[string]clientRecord{}, Version: SchemaVersion, Note: model.SharedNote{ID: "shared"}, Principals: map[string]principalRecord{}, Messages: []model.Message{}, Files: map[string]model.File{}, Services: map[string]model.Service{}, OwnerID: ownerID, OwnerHash: secure.Hash(token), Devices: map[string]deviceRecord{}, Pairings: map[string]pairingRecord{}, Events: []model.Event{}}
 	return createDB(path, s)
 }
 func Open(path string) (*Store, error) { return openDB(path) }
@@ -81,6 +85,7 @@ func cloneMetadata(s snapshot) snapshot {
 	// mutations replace values; slices owned by Service are explicitly cloned.
 	n := s
 	n.Principals = maps.Clone(s.Principals)
+	n.Clients = maps.Clone(s.Clients)
 	n.Devices = maps.Clone(s.Devices)
 	n.Files = maps.Clone(s.Files)
 	n.Pairings = maps.Clone(s.Pairings)
@@ -138,6 +143,14 @@ func (st *Store) Auth(token string) (Subject, error) {
 			return Subject{ID: id, Role: "device"}, nil
 		}
 	}
+	for _, rec := range st.s.Clients {
+		if secure.Equal(h, rec.TokenHash) {
+			if !clientActive(&st.s, rec) {
+				return Subject{}, ErrPrincipalInactive
+			}
+			return Subject{ID: rec.Client.PrincipalID, Role: "member", CredentialStamp: h, Source: model.Source{ClientID: rec.Client.ID, Kind: rec.Client.Kind}}, nil
+		}
+	}
 	for id, rec := range st.s.Principals {
 		if rec.TokenHash != "" && secure.Equal(h, rec.TokenHash) {
 			if !activePrincipal(&st.s, id) {
@@ -162,7 +175,7 @@ func (st *Store) Pair(ttl time.Duration, requestID string) (model.PairingRespons
 		if len(s.Pairings) >= 64 {
 			return errors.New("too many active pairing codes")
 		}
-		s.Pairings[secure.Hash(r.Code)] = pairingRecord{r.ExpiresAt}
+		s.Pairings[secure.Hash(r.Code)] = pairingRecord{OwnerID: s.OwnerID, ExpiresAt: r.ExpiresAt}
 		addEvent(s, model.Event{ActorID: s.OwnerID, Action: "pairing.created", Result: "success", RequestID: requestID})
 		return nil
 	})
@@ -199,9 +212,27 @@ func (st *Store) Join(q model.JoinRequest, maxDevices int, requestID string) (mo
 		if active >= maxDevices {
 			return errors.New("device quota exceeded")
 		}
+		owner := p.OwnerID
+		if owner == "" {
+			owner = s.OwnerID
+		} // Legacy invitations were Owner-issued.
+		if !activePrincipal(s, owner) || (p.IssuerStamp != "" && !activeSubject(s, Subject{ID: owner, Role: "member", CredentialStamp: p.IssuerStamp})) {
+			return ErrPairing
+		}
+		if owner != s.OwnerID {
+			count := 0
+			for _, d := range s.Devices {
+				if d.Device.OwnerID == owner && d.Device.RevokedAt == nil {
+					count++
+				}
+			}
+			if count >= 8 {
+				return ErrQuota
+			}
+		}
 		delete(s.Pairings, h) // Consume the invitation in the same durable commit as registration.
-		s.Devices[r.DeviceID] = deviceRecord{Device: model.Device{ID: r.DeviceID, Name: q.Name, OS: q.OS, Arch: q.Arch, NodeVersion: q.NodeVersion, OwnerID: s.OwnerID, CreatedAt: time.Now().UTC(), Status: "offline"}, TokenHash: secure.Hash(r.Token)}
-		addEvent(s, model.Event{ActorID: s.OwnerID, DeviceID: r.DeviceID, Action: "device.paired", ResourceID: r.DeviceID, Result: "success", RequestID: requestID})
+		s.Devices[r.DeviceID] = deviceRecord{Device: model.Device{ID: r.DeviceID, Name: q.Name, OS: q.OS, Arch: q.Arch, NodeVersion: q.NodeVersion, OwnerID: owner, CreatedAt: time.Now().UTC(), Status: "offline"}, TokenHash: secure.Hash(r.Token)}
+		addEvent(s, model.Event{ActorID: owner, DeviceID: r.DeviceID, Action: "device.paired", ResourceID: r.DeviceID, Result: "success", RequestID: requestID})
 		return nil
 	})
 	return r, e

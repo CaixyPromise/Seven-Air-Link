@@ -33,6 +33,8 @@ type Grants struct {
 	AllowPrincipals []string `json:"allowPrincipals"`
 }
 type Forward struct {
+	ClientID        string    `json:"clientId,omitempty"`
+	SourceIP        string    `json:"sourceIp,omitempty"`
 	ID              string    `json:"id"`
 	ServiceID       string    `json:"serviceId"`
 	ActorID         string    `json:"actorId"`

@@ -165,7 +165,16 @@ func (a *application) services(ctx context.Context, args []string) error {
 		}
 		g := model.Grants{AllowDevices: csv(*devices), AllowPrincipals: csv(*principals)}
 		if *owner {
-			g.AllowPrincipals = append(g.AllowPrincipals, svc.OwnerPrincipalID)
+			var me struct {
+				OwnerID string `json:"serverOwnerId"`
+			}
+			if e = c.Do(ctx, "GET", "/api/v1/me", nil, &me); e != nil {
+				return e
+			}
+			if me.OwnerID == "" {
+				return errors.New("server did not identify its Owner")
+			}
+			g.AllowPrincipals = append(g.AllowPrincipals, me.OwnerID)
 		}
 		var out any
 		if e = c.Do(ctx, "PATCH", "/api/v1/services/"+svc.ID, g, &out); e != nil {

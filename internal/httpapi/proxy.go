@@ -115,7 +115,7 @@ func (s *Server) serveProxy(w http.ResponseWriter, r *http.Request) {
 				delete(s.proxySessions, k)
 			}
 		}
-		if !ok || g.ServiceID != id || now.After(g.Expires) || len(s.proxySessions) >= 128 {
+		if !ok || g.ServiceID != id || now.After(g.Expires) || len(s.proxySessions) >= 128 || (g.Subject.Role == "owner" && !localRequest(r)) {
 			s.mu.Unlock()
 			s.deny(w, r, 403, "ticket_invalid_or_expired", "create a new service-specific ticket")
 			return
@@ -165,6 +165,11 @@ func (s *Server) serveProxy(w http.ResponseWriter, r *http.Request) {
 	}
 	if e != nil {
 		s.deny(w, r, 401, "unauthenticated", "use a service-scoped browser ticket or an explicitly granted CLI identity")
+		return
+	}
+	sub, e = s.requestSubject(r, sub, "")
+	if e != nil {
+		s.deny(w, r, 403, "owner_local_only", "Owner access requires local Server connection")
 		return
 	}
 	// Revoked devices may have old proxy cookies; cookies never bypass revocation.

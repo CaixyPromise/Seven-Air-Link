@@ -2,6 +2,17 @@
 
 This project uses release candidate tags of the form `MAJOR.MINOR.PATCH-rc.N`.
 
+## 0.1.0-rc.4 — Unreleased
+
+- Replace shared-Owner password login with independent browser/CLI Member enrollment.
+- Restrict Owner administration to Server-local credentials and loopback connections.
+- Explicit, single-use browser-to-CLI linking with independently revocable credentials.
+- Member-owned Node enrollment and Bots, without global management privileges.
+- Server-issued UI capabilities and note/audit source provenance.
+- Transactional schema 5→6 migration; legacy Owner password disabled, other data retained.
+- Identity-specific HTTP/process/network-namespace tests, scoped stream revocation, migration and offline UI tests.
+- Publication awaits native CI and live browser acceptance; prior tags unchanged.
+
 ## 0.1.0-rc.3 — 2026-10-30
 
 - Fixed Owner Web password login, salted PBKDF2-HMAC-SHA256/600000, no-echo CLI

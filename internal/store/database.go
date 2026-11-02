@@ -13,7 +13,7 @@ import (
 )
 
 var schema = []string{
-	`CREATE TABLE server_state (id INTEGER PRIMARY KEY CHECK(id=1), schema_version INTEGER NOT NULL CHECK(schema_version=5), owner_id TEXT NOT NULL, owner_hash TEXT NOT NULL, seq INTEGER NOT NULL, message_seq INTEGER NOT NULL, message_bytes INTEGER NOT NULL, revision INTEGER NOT NULL)`,
+	`CREATE TABLE server_state (id INTEGER PRIMARY KEY CHECK(id=1), schema_version INTEGER NOT NULL CHECK(schema_version=6), owner_id TEXT NOT NULL, owner_hash TEXT NOT NULL, seq INTEGER NOT NULL, message_seq INTEGER NOT NULL, message_bytes INTEGER NOT NULL, revision INTEGER NOT NULL)`,
 	`CREATE TABLE principals (id TEXT PRIMARY KEY, data TEXT NOT NULL)`,
 	`CREATE TABLE devices (id TEXT PRIMARY KEY, data TEXT NOT NULL)`,
 	`CREATE TABLE pairings (id TEXT PRIMARY KEY, data TEXT NOT NULL)`,
@@ -26,8 +26,9 @@ var schema = []string{
 	`CREATE TABLE events (seq INTEGER PRIMARY KEY, actor_id TEXT NOT NULL, correlation_id TEXT NOT NULL, data TEXT NOT NULL)`,
 	`CREATE INDEX events_actor_seq ON events(actor_id,seq)`,
 	`CREATE TABLE migrations (source_sha256 TEXT PRIMARY KEY, source_version INTEGER NOT NULL, migrated_at TEXT NOT NULL)`,
-	webAuthDDL, noteDDL,
-	`PRAGMA user_version=5`,
+	webAuthDDL, noteDDL, `ALTER TABLE shared_notes ADD COLUMN source TEXT NOT NULL DEFAULT ''`,
+	`CREATE TABLE clients (id TEXT PRIMARY KEY, data TEXT NOT NULL)`,
+	`PRAGMA user_version=6`,
 }
 
 func configureDB(db *sqlite.DB) error {
@@ -56,6 +57,9 @@ func createDB(path string, s snapshot) (*Store, error) {
 	}
 	st := &Store{path: db.Path(), db: db, s: s}
 	st.s.Version = SchemaVersion
+	if st.s.Clients == nil {
+		st.s.Clients = map[string]clientRecord{}
+	}
 	st.s.Note.ID = "shared"
 	e = db.Transaction(func(tx *sqlite.Tx) error {
 		for _, q := range schema {
@@ -63,7 +67,7 @@ func createDB(path string, s snapshot) (*Store, error) {
 				return e
 			}
 		}
-		if _, e := tx.Exec("INSERT INTO server_state VALUES(1,5,?,?,?,?,?,?)", s.OwnerID, s.OwnerHash, s.Seq, s.MessageSeq, s.MessageBytes, s.Revision); e != nil {
+		if _, e := tx.Exec("INSERT INTO server_state VALUES(1,6,?,?,?,?,?,?)", s.OwnerID, s.OwnerHash, s.Seq, s.MessageSeq, s.MessageBytes, s.Revision); e != nil {
 			return e
 		}
 		return syncRecords(tx, snapshot{}, st.s)
@@ -103,6 +107,9 @@ func openDBMode(path string, upgrade bool) (*Store, error) {
 		if e = upgradeSchema4(db); e != nil {
 			return fail(e)
 		}
+		if e = upgradeIdentitySchema(db); e != nil {
+			return fail(e)
+		}
 	}
 	s, e := readMetadata(db)
 	if e != nil {
@@ -125,7 +132,7 @@ func checkSchema(db *sqlite.DB) error {
 	if e != nil {
 		return e
 	}
-	if len(rows) != 1 || (rows[0][0] != int64(4) && rows[0][0] != int64(SchemaVersion)) {
+	if len(rows) != 1 || (rows[0][0] != int64(4) && rows[0][0] != int64(5) && rows[0][0] != int64(SchemaVersion)) {
 		return errors.New("unsupported database schema; refusing reset")
 	}
 	return nil
@@ -147,7 +154,7 @@ func readMetadata(db *sqlite.DB) (snapshot, error) {
 	s.MessageSeq = r[4].(int64)
 	s.MessageBytes = r[5].(int64)
 	s.Revision = r[6].(int64)
-	if s.OwnerID == "" || len(s.OwnerHash) != 64 || (s.Version != 4 && s.Version != SchemaVersion) || s.Seq < 0 || s.MessageSeq < 0 {
+	if s.OwnerID == "" || len(s.OwnerHash) != 64 || (s.Version != 4 && s.Version != 5 && s.Version != SchemaVersion) || s.Seq < 0 || s.MessageSeq < 0 {
 		return s, errors.New("corrupt authority metadata")
 	}
 	if s.Principals, e = loadMap[principalRecord](db, "principals"); e != nil {
@@ -164,6 +171,17 @@ func readMetadata(db *sqlite.DB) (snapshot, error) {
 	}
 	if s.Files, e = loadMap[model.File](db, "files"); e != nil {
 		return s, e
+	}
+	s.Clients = map[string]clientRecord{}
+	if s.Version >= 6 {
+		if s.Clients, e = loadMap[clientRecord](db, "clients"); e != nil {
+			return s, e
+		}
+	}
+	for id, c := range s.Clients {
+		if id != c.Client.ID || len(c.TokenHash) != 64 || c.Client.PrincipalID == s.OwnerID || s.Principals[c.Client.PrincipalID].Principal.ID == "" || (c.Client.Kind != "browser" && c.Client.Kind != "cli") {
+			return s, errors.New("corrupt client metadata")
+		}
 	}
 	if e = readNotesAuth(db, &s); e != nil {
 		return s, e
@@ -246,6 +264,9 @@ func syncMap[T any](tx *sqlite.Tx, table string, old, next map[string]T) error {
 	return nil
 }
 func syncRecords(tx *sqlite.Tx, old, next snapshot) error {
+	if e := syncMap(tx, "clients", old.Clients, next.Clients); e != nil {
+		return e
+	}
 	if e := syncNotesAuth(tx, old, next); e != nil {
 		return e
 	}

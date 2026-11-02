@@ -13,13 +13,13 @@ def run(binary):
             while prompt.encode() not in transcript:
                 if time.monotonic()>deadline:raise AssertionError('terminal prompt did not arrive')
                 if select.select([master],[],[],.1)[0]:transcript.extend(os.read(master,4096))
-        wait('Set administrator web password: ');assert not termios.tcgetattr(slave)[3]&termios.ECHO
+        wait('Set LAN joining password: ');assert not termios.tcgetattr(slave)[3]&termios.ECHO
         os.write(master,(secret+'\n').encode());wait('Confirm password: ');assert not termios.tcgetattr(slave)[3]&termios.ECHO
         os.write(master,(secret+'\n').encode());out=p.communicate(timeout=10)[0]
         while select.select([master],[],[],.05)[0]:transcript.extend(os.read(master,4096))
         assert p.returncode==0 and json.loads(out)['password']['enabled'];assert secret.encode() not in transcript and secret.encode() not in out
         assert termios.tcgetattr(slave)[3]&termios.ECHO==before[3]&termios.ECHO
-        return {'status':'PASS','terminal':'POSIX PTY','checks':['set/confirm disable echo','password never printed','ECHO restored','Server password set successful']}
+        return {'status':'PASS','terminal':'POSIX PTY','checks':['set/confirm disable echo','password never printed','ECHO restored','Server joining password set successful']}
     finally:
         if p and p.poll() is None:p.kill();p.wait()
         for fd in (master,slave):

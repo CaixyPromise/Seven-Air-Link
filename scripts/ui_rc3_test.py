@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Real Chromium + TLS Server E2E, retaining CSP and all application protections.
+"""Historical rc.3 OWNER-password UI contract; use ui_identity_test.py on rc.4.
+Real Chromium + TLS Server E2E, retaining CSP and all application protections.
 
 Locator assertions auto-wait without eval. Self-signed TLS acceptance applies
 only to these disposable browser contexts, never to production CLI pinning.

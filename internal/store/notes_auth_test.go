@@ -167,7 +167,7 @@ func TestWebPasswordPersistenceRevisionAndAuthority(t *testing.T) {
 func downgradeFixtureTo4(t *testing.T, st *Store) {
 	t.Helper()
 	e := st.db.Transaction(func(tx *sqlite.Tx) error {
-		for _, q := range []string{`CREATE TABLE server_state_v4(id INTEGER PRIMARY KEY CHECK(id=1), schema_version INTEGER NOT NULL CHECK(schema_version=4),owner_id TEXT NOT NULL,owner_hash TEXT NOT NULL,seq INTEGER NOT NULL,message_seq INTEGER NOT NULL,message_bytes INTEGER NOT NULL,revision INTEGER NOT NULL)`, `INSERT INTO server_state_v4 SELECT id,4,owner_id,owner_hash,seq,message_seq,message_bytes,revision FROM server_state`, `DROP TABLE server_state`, `ALTER TABLE server_state_v4 RENAME TO server_state`, `DROP TABLE web_auth`, `DROP TABLE shared_notes`, `PRAGMA user_version=4`} {
+		for _, q := range []string{`CREATE TABLE server_state_v4(id INTEGER PRIMARY KEY CHECK(id=1), schema_version INTEGER NOT NULL CHECK(schema_version=4),owner_id TEXT NOT NULL,owner_hash TEXT NOT NULL,seq INTEGER NOT NULL,message_seq INTEGER NOT NULL,message_bytes INTEGER NOT NULL,revision INTEGER NOT NULL)`, `INSERT INTO server_state_v4 SELECT id,4,owner_id,owner_hash,seq,message_seq,message_bytes,revision FROM server_state`, `DROP TABLE server_state`, `ALTER TABLE server_state_v4 RENAME TO server_state`, `DROP TABLE web_auth`, `DROP TABLE shared_notes`, `DROP TABLE clients`, `PRAGMA user_version=4`} {
 			if _, e := tx.Exec(q); e != nil {
 				return e
 			}
@@ -210,13 +210,13 @@ func TestSchema4UpgradeAndBackupRestoreNotesPassword(t *testing.T) {
 		t.Fatal(e)
 	}
 	hash, _ := secure.HashPassword("upgrade-test-password-123")
-	if e = st.SetWebPassword(owner, hash, 0, "password"); e != nil {
+	if e = st.SetWebPassword(owner, hash, st.WebPasswordStatus().Revision, "password"); e != nil {
 		t.Fatal(e)
 	}
 	st.Close()
 	backup := filepath.Join(t.TempDir(), "backup5")
 	r, e := Backup(dir, backup)
-	if e != nil || r.Schema != 5 {
+	if e != nil || r.Schema != SchemaVersion {
 		t.Fatal(r, e)
 	}
 	dest := filepath.Join(t.TempDir(), "restored")
